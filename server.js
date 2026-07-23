@@ -9,7 +9,6 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
 
-// Link API Google Apps Script của anh
 const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbwzhd1IGWLGPs7gUe6tYf4bC5X6xUajAFwEJGH29LU9viXuV2zXvCTfEPaL_1WL8xDZmw/exec";
 const QUESTIONS_FILE = path.join(__dirname, 'questions.json');
 
@@ -42,7 +41,6 @@ async function saveUserData() {
   }
 }
 
-// Tải dữ liệu ngay khi khởi động Server
 loadUserDataFromSheet();
 
 // 2. Các hàm bổ trợ
@@ -112,12 +110,13 @@ function getLeaderboard() {
     .slice(0, 10);
 }
 
-// 3. Logic Bot AI Luyện Tập
+// 3. Logic Bot AI Luyện Tập (Tăng tốc độ phản xạ của Bot)
 function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
 
-  let delay = Math.floor(Math.random() * 2000) + 1500; // Bot trả lời trong 1.5s - 3.5s
+  // Bot phản xạ nhanh hơn: 0.8s - 1.8s
+  let delay = Math.floor(Math.random() * 1000) + 800; 
 
   room.botTimer = setTimeout(() => {
     if (!room || room.answered) return;
@@ -128,6 +127,7 @@ function scheduleBotAnswer(roomId) {
 
     io.to(roomId).emit('roundResult', { winner: botName, matchScores: room.matchScores });
 
+    // Rút ngắn thời gian chờ sang câu mới còn 1.2 giây
     setTimeout(() => {
       room.currentQ++;
       if (room.currentQ < room.questions.length) {
@@ -137,7 +137,7 @@ function scheduleBotAnswer(roomId) {
       } else {
         finishPracticeGame(roomId);
       }
-    }, 3000);
+    }, 1200);
   }, delay);
 }
 
@@ -162,7 +162,7 @@ async function finishPracticeGame(roomId) {
     }
     usersData[humanPlayer.username].exp = (usersData[humanPlayer.username].exp || 0) + 2;
     
-    // Lưu điểm vĩnh viễn sang Google Sheets
+    // Lưu vĩnh viễn
     await saveUserData();
   }
 
@@ -176,7 +176,6 @@ io.on('connection', (socket) => {
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
 
-  // Luyện tập với Bot
   socket.on('joinPractice', ({ username, lesson }) => {
     if (!username) return;
 
@@ -293,13 +292,14 @@ io.on('connection', (socket) => {
     let q = room.questions[room.currentQ];
 
     if (optionIndex === q.answer) {
-      // TRẢ LỜI ĐÚNG: Cộng 10 điểm
+      // ĐÚNG: Cộng 10 điểm
       room.answered = true;
       if (room.botTimer) clearTimeout(room.botTimer);
 
       room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) + 10;
       io.to(roomId).emit('roundResult', { winner: socket.username, matchScores: room.matchScores });
 
+      // Rút ngắn thời gian chờ còn 1.2s trước khi sang câu mới
       setTimeout(async () => {
         room.currentQ++;
         if (room.currentQ < room.questions.length) {
@@ -334,15 +334,15 @@ io.on('connection', (socket) => {
             io.emit('roomListUpdate', getPublicRooms());
           }
         }
-      }, 3000);
+      }, 1200);
     } else {
-      // TRẢ LỜI SAI: Trừ 5 điểm (không giảm dưới 0)
+      // SAI: Trừ 5 điểm và BẮN ĐIỂM CẬP NHẬT TỨC THÌ
       let currentScore = room.matchScores[socket.username] || 0;
       room.matchScores[socket.username] = Math.max(0, currentScore - 5);
 
-      // Phát thông báo điểm mới và cảnh báo sai về client
-      io.to(roomId).emit('scoreUpdate', { matchScores: room.matchScores });
-      socket.emit('wrongAnswer', 'Sai rồi! Bị trừ 5 điểm, chọn lại nào.');
+      // Phát sự kiện roundResult/scoreUpdate ngay lập tức để màn hình cập nhật điểm mới
+      io.to(roomId).emit('roundResult', { winner: null, matchScores: room.matchScores });
+      socket.emit('wrongAnswer', 'Sai rồi! Bị trừ 5 điểm.');
     }
   });
 
