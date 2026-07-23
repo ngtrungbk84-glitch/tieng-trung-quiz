@@ -21,7 +21,6 @@ function saveUserData() {
   fs.writeFileSync(USER_DATA_FILE, JSON.stringify(usersData, null, 2));
 }
 
-// Đọc câu hỏi theo Lesson
 function getQuestionsByLesson(lesson) {
   if (fs.existsSync(QUESTIONS_FILE)) {
     try {
@@ -43,7 +42,6 @@ function getRank(exp) {
 let roomCounter = 5;
 let rooms = {};
 
-// Khởi tạo 5 bàn mặc định (mặc định Lesson 1)
 for (let i = 1; i <= 5; i++) {
   createRoomObject(`Bàn ${i}`, 1);
 }
@@ -56,6 +54,8 @@ function createRoomObject(roomId, lesson = 1) {
     currentQ: 0,
     matchScores: {},
     answered: false,
+    isPractice: false,
+    botTimer: null,
     questions: getQuestionsByLesson(lesson)
   };
 }
@@ -63,12 +63,14 @@ function createRoomObject(roomId, lesson = 1) {
 function getPublicRooms() {
   let list = [];
   for (let id in rooms) {
-    list.push({
-      id: id,
-      lesson: rooms[id].lesson,
-      playerCount: rooms[id].players.length,
-      players: rooms[id].players.map(p => p.username)
-    });
+    if (!rooms[id].isPractice) { // Chỉ hiện các bàn P2P thường ra sảnh
+      list.push({
+        id: id,
+        lesson: rooms[id].lesson,
+        playerCount: rooms[id].players.length,
+        players: rooms[id].players.map(p => p.username)
+      });
+    }
   }
   return list;
 }
@@ -79,11 +81,108 @@ function getLeaderboard() {
     .sort((a, b) => b.exp - a.exp).slice(0, 10);
 }
 
+// Logic cho Bot tự động trả lời
+function scheduleBotAnswer(roomId) {
+  let room = rooms[roomId];
+  if (!room || !room.isPractice) return;
+
+  // Bot trả lời ngẫu nhiên sau 1.5 đến 3.5 giây
+  let delay = Math.floor(Math.random() * 2000) + 1500;
+
+  room.botTimer = setTimeout(() => {
+    if (!room || room.answered) return;
+
+    room.answered = true;
+    let botName = "🤖 Bot HSK";
+    room.matchScores[botName] = (room.matchScores[botName] || 0) + 10;
+
+    io.to(roomId).emit('roundResult', { winner: botName, matchScores: room.matchScores });
+
+    setTimeout(() => {
+      room.currentQ++;
+      if (room.currentQ < room.questions.length) {
+        room.answered = false;
+        io.to(roomId).emit('nextQuestion', room.questions[room.currentQ]);
+        scheduleBotAnswer(roomId); // Đặt lịch cho câu tiếp theo
+      } else {
+        finishPracticeGame(roomId);
+      }
+    }, 3000);
+  }, delay);
+}
+
+function finishPracticeGame(roomId) {
+  let room = rooms[roomId];
+  if (!room) return;
+
+  let humanPlayer = room.players.find(p => p.username !== "🤖 Bot HSK");
+  let botName = "🤖 Bot HSK";
+  let winnerName = null;
+
+  if (humanPlayer) {
+    let pScore = room.matchScores[humanPlayer.username] || 0;
+    let bScore = room.matchScores[botName] || 0;
+
+    if (pScore > bScore) {
+      winnerName = humanPlayer.username;
+      usersData[humanPlayer.username].exp += 10; // Đấu với Bot cộng ít EXP hơn
+      usersData[humanPlayer.username].wins += 1;
+    } else if (bScore > pScore) {
+      winnerName = botName;
+    }
+    usersData[humanPlayer.username].exp += 2;
+    saveUserData();
+  }
+
+  io.to(roomId).emit('gameOver', { winner: winnerName });
+  delete rooms[roomId]; // Xóa phòng tập khi xong
+}
+
 io.on('connection', (socket) => {
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
 
-  // Nút Mở Bàn Mới (Cho chọn Lesson)
+  // Chế độ TỰ LUYỆN TẬP VỚI BOT
+  socket.on('joinPractice', ({ username, lesson }) => {
+    if (!username) return;
+
+    socket.username = username;
+    let practiceRoomId = `Luyện Tập - ${socket.id.substring(0, 4)}`;
+    socket.roomId = practiceRoomId;
+
+    if (!usersData[username]) {
+      usersData[username] = { exp: 0, wins: 0 };
+      saveUserData();
+    }
+
+    // Tạo phòng luyện tập riêng
+    rooms[practiceRoomId] = {
+      id: practiceRoomId,
+      lesson: lesson || 1,
+      players: [socket, { username: "🤖 Bot HSK" }],
+      currentQ: 0,
+      matchScores: { [username]: 0, "🤖 Bot HSK": 0 },
+      answered: false,
+      isPractice: true,
+      questions: getQuestionsByLesson(lesson || 1)
+    };
+
+    socket.join(practiceRoomId);
+
+    // Bắt đầu game ngay lập tức
+    socket.emit('gameStart', {
+      roomId: practiceRoomId,
+      lesson: lesson || 1,
+      players: [
+        { name: username, rank: getRank(usersData[username].exp) },
+        { name: "🤖 Bot HSK", rank: "🤖 AI Trí Tuệ" }
+      ],
+      question: rooms[practiceRoomId].questions[0]
+    });
+
+    scheduleBotAnswer(practiceRoomId);
+  });
+
   socket.on('createNewRoom', (selectedLesson) => {
     if (Object.keys(rooms).length >= 10) {
       socket.emit('notice', 'Sảnh đã đạt giới hạn tối đa 10 bàn!');
@@ -95,7 +194,6 @@ io.on('connection', (socket) => {
     io.emit('roomListUpdate', getPublicRooms());
   });
 
-  // Đổi Lesson cho Bàn đang chờ
   socket.on('changeRoomLesson', ({ roomId, lesson }) => {
     if (rooms[roomId] && rooms[roomId].players.length < 2) {
       rooms[roomId].lesson = lesson;
@@ -139,10 +237,10 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Nút Quay lại / Rời bàn
   socket.on('leaveRoom', () => {
     let roomId = socket.roomId;
     if (roomId && rooms[roomId]) {
+      if (rooms[roomId].botTimer) clearTimeout(rooms[roomId].botTimer);
       socket.leave(roomId);
       rooms[roomId].players = rooms[roomId].players.filter(p => p.id !== socket.id);
       socket.roomId = null;
@@ -159,8 +257,9 @@ io.on('connection', (socket) => {
     let q = room.questions[room.currentQ];
     if (optionIndex === q.answer) {
       room.answered = true;
-      room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) + 10;
+      if (room.botTimer) clearTimeout(room.botTimer); // Hủy đếm giờ trả lời của Bot nếu người chơi thắng câu này
 
+      room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) + 10;
       io.to(roomId).emit('roundResult', { winner: socket.username, matchScores: room.matchScores });
 
       setTimeout(() => {
@@ -168,21 +267,26 @@ io.on('connection', (socket) => {
         if (room.currentQ < room.questions.length) {
           room.answered = false;
           io.to(roomId).emit('nextQuestion', room.questions[room.currentQ]);
+          if (room.isPractice) scheduleBotAnswer(roomId);
         } else {
-          let pNames = room.players.map(p => p.username);
-          let p1 = pNames[0], p2 = pNames[1];
-          let winnerName = null;
+          if (room.isPractice) {
+            finishPracticeGame(roomId);
+          } else {
+            let pNames = room.players.map(p => p.username);
+            let p1 = pNames[0], p2 = pNames[1];
+            let winnerName = null;
 
-          if (room.matchScores[p1] > room.matchScores[p2]) winnerName = p1;
-          else if (room.matchScores[p2] > room.matchScores[p1]) winnerName = p2;
+            if (room.matchScores[p1] > room.matchScores[p2]) winnerName = p1;
+            else if (room.matchScores[p2] > room.matchScores[p1]) winnerName = p2;
 
-          if (winnerName) { usersData[winnerName].exp += 20; usersData[winnerName].wins += 1; }
-          pNames.forEach(p => { if (p !== winnerName) usersData[p].exp += 5; });
-          saveUserData();
+            if (winnerName) { usersData[winnerName].exp += 20; usersData[winnerName].wins += 1; }
+            pNames.forEach(p => { if (p !== winnerName) usersData[p].exp += 5; });
+            saveUserData();
 
-          io.to(roomId).emit('gameOver', { winner: winnerName });
-          createRoomObject(roomId, room.lesson);
-          io.emit('roomListUpdate', getPublicRooms());
+            io.to(roomId).emit('gameOver', { winner: winnerName });
+            createRoomObject(roomId, room.lesson);
+            io.emit('roomListUpdate', getPublicRooms());
+          }
         }
       }, 3000);
     } else {
@@ -193,9 +297,14 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     let roomId = socket.roomId;
     if (roomId && rooms[roomId]) {
-      io.to(roomId).emit('playerLeft', `${socket.username} đã rời bàn.`);
-      createRoomObject(roomId, rooms[roomId].lesson);
-      io.emit('roomListUpdate', getPublicRooms());
+      if (rooms[roomId].botTimer) clearTimeout(rooms[roomId].botTimer);
+      if (!rooms[roomId].isPractice) {
+        io.to(roomId).emit('playerLeft', `${socket.username} đã rời bàn.`);
+        createRoomObject(roomId, rooms[roomId].lesson);
+        io.emit('roomListUpdate', getPublicRooms());
+      } else {
+        delete rooms[roomId];
+      }
     }
   });
 });
