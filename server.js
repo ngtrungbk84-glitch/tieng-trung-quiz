@@ -2,114 +2,185 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+  cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-// Danh sách câu hỏi tiếng Trung (Anh có thể thêm/sửa tùy ý)
-const QUESTIONS = [
-  { id: 1, q: "Từ nào nghĩa là 'Cảm ơn'?", options: ["你好 (Nǐ hǎo)", "谢谢 (Xièxie)", "再见 (Zàijiàn)", "对不起 (Duìbuqǐ)"], answer: 1 },
-  { id: 2, q: "Từ nào nghĩa là 'Tạm biệt'?", options: ["再见 (Zàijiàn)", "谢谢 (Xièxie)", "不客气 (Bú kèqi)", "好的 (Hǎo de)"], answer: 0 },
-  { id: 3, q: "Pinyin của '苹果' (Quả táo) là gì?", options: ["Míngtiān", "Píngguǒ", "Shuǐguǒ", "Chéngzi"], answer: 1 },
-  { id: 4, q: "Từ nào nghĩa là 'Nước'?", options: ["茶 (Chá)", "酒 (Jiǔ)", "水 (Shuǐ)", "奶 (Nǎi)"], answer: 2 },
-];
+// File lưu điểm tích lũy & câu hỏi
+const USER_DATA_FILE = path.join(__dirname, 'users.json');
+const QUESTIONS_FILE = path.join(__dirname, 'questions.json');
 
-let players = [];      // Danh sách socket người chơi
-let currentQuestion = 0;
-let scores = {};
-let answeredInRound = false;
-
-// Hàm reset bàn chơi về trạng thái ban đầu
-function resetGame() {
-  players = [];
-  scores = {};
-  currentQuestion = 0;
-  answeredInRound = false;
-  console.log('--- BÀN CHƠI ĐÃ ĐƯỢC RESET VỀ TRẠNG THÁI MỚI ---');
+// Đọc dữ liệu user
+let usersData = {};
+if (fs.existsSync(USER_DATA_FILE)) {
+  try { usersData = JSON.parse(fs.readFileSync(USER_DATA_FILE, 'utf8')); } catch (e) { usersData = {}; }
 }
 
-io.on('connection', (socket) => {
-  console.log('Một kết nối mới:', socket.id);
+function saveUserData() {
+  fs.writeFileSync(USER_DATA_FILE, JSON.stringify(usersData, null, 2));
+}
 
-  // Người dùng đăng ký Username
-  socket.on('joinGame', (username) => {
-    // Nếu phòng đã đủ 2 người, không cho vào nữa
-    if (players.length >= 2) {
-      socket.emit('waiting', 'Phòng đang đầy (đang có trận đấu). Vui lòng đợi vài giây rồi bấm thử lại!');
+// Đọc danh sách câu hỏi từ file questions.json
+function getQuestions() {
+  if (fs.existsSync(QUESTIONS_FILE)) {
+    try { return JSON.parse(fs.readFileSync(QUESTIONS_FILE, 'utf8')); } catch (e) { return []; }
+  }
+  return [];
+}
+
+// Tính Cấp độ / Rank dựa trên tổng điểm
+function getRank(exp) {
+  if (exp >= 500) return "🐉 HSK Master";
+  if (exp >= 200) return "🥇 Cao thủ HSK";
+  if (exp >= 100) return "🥈 Trung cấp";
+  if (exp >= 30)  return "🥉 Sơ cấp";
+  return "🌱 Tân thủ";
+}
+
+// Quản lý danh sách các phòng chơi
+// Cấu trúc: rooms[roomId] = { players: [], currentQ: 0, scores: {}, answered: false, questions: [] }
+let rooms = {};
+
+io.on('connection', (socket) => {
+
+  // Gửi bảng xếp hạng khi người dùng kết nối
+  socket.emit('leaderboardUpdate', getLeaderboard());
+
+  socket.on('joinRoom', ({ username, roomId }) => {
+    roomId = roomId.trim().toUpperCase() || 'PHONG-1';
+    socket.username = username;
+    socket.roomId = roomId;
+
+    // Khởi tạo user nếu chưa có trong DB
+    if (!usersData[username]) {
+      usersData[username] = { exp: 0, wins: 0 };
+      saveUserData();
+    }
+
+    // Khởi tạo phòng nếu chưa có
+    if (!rooms[roomId]) {
+      rooms[roomId] = {
+        players: [],
+        currentQ: 0,
+        matchScores: {},
+        answered: false,
+        questions: getQuestions()
+      };
+    }
+
+    let room = rooms[roomId];
+
+    // Kiểm tra số lượng người trong phòng
+    if (room.players.length >= 2) {
+      socket.emit('waiting', `Phòng ${roomId} đã đầy (tối đa 2 người). Vui lòng chọn phòng khác!`);
       return;
     }
 
-    socket.username = username;
-    players.push(socket);
-    scores[username] = 0;
+    socket.join(roomId);
+    room.players.push(socket);
+    room.matchScores[username] = 0;
 
-    console.log(`${username} đã tham gia bàn.`);
+    console.log(`${username} vào phòng [${roomId}]`);
 
-    // Khi đủ 2 người chơi -> Bắt đầu game
-    if (players.length === 2) {
-      currentQuestion = 0;
-      answeredInRound = false;
-      io.emit('gameStart', {
-        players: players.map(p => p.username),
-        question: QUESTIONS[currentQuestion]
+    if (room.players.length === 2) {
+      room.currentQ = 0;
+      room.answered = false;
+      io.to(roomId).emit('gameStart', {
+        roomId: roomId,
+        players: room.players.map(p => ({
+          name: p.username,
+          rank: getRank(usersData[p.username].exp),
+          exp: usersData[p.username].exp
+        })),
+        question: room.questions[room.currentQ]
       });
     } else {
-      socket.emit('waiting', 'Đang chờ người chơi thứ 2 vào bàn...');
+      socket.emit('waiting', `Đã vào phòng [${roomId}]. Đang chờ người chơi thứ 2...`);
     }
   });
 
-  // Người chơi chọn đáp án
   socket.on('submitAnswer', (optionIndex) => {
-    if (answeredInRound) return; // Nếu đã có người trả lời nhanh hơn trong câu này rồi thì bỏ qua
+    let roomId = socket.roomId;
+    let room = rooms[roomId];
+    if (!room || room.answered) return;
 
-    const q = QUESTIONS[currentQuestion];
+    let q = room.questions[room.currentQ];
     if (optionIndex === q.answer) {
-      answeredInRound = true;
-      scores[socket.username] = (scores[socket.username] || 0) + 10;
+      room.answered = true;
+      room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) + 10;
 
-      io.emit('roundResult', {
+      io.to(roomId).emit('roundResult', {
         winner: socket.username,
-        scores: scores,
+        matchScores: room.matchScores,
         correctAnswer: q.options[q.answer]
       });
 
-      // Chuyển sang câu tiếp theo sau 3 giây
       setTimeout(() => {
-        currentQuestion++;
-        if (currentQuestion < QUESTIONS.length) {
-          answeredInRound = false;
-          io.emit('nextQuestion', QUESTIONS[currentQuestion]);
+        room.currentQ++;
+        if (room.currentQ < room.questions.length) {
+          room.answered = false;
+          io.to(roomId).emit('nextQuestion', room.questions[room.currentQ]);
         } else {
-          // Hết câu hỏi -> Thông báo kết thúc và TỰ ĐỘNG RESET BÀN
-          io.emit('gameOver', scores);
-          resetGame();
+          // Kết thúc trận -> Cộng điểm tích lũy thăng hạng
+          let pNames = room.players.map(p => p.username);
+          let p1 = pNames[0], p2 = pNames[1];
+          let winnerName = null;
+
+          if (room.matchScores[p1] > room.matchScores[p2]) winnerName = p1;
+          else if (room.matchScores[p2] > room.matchScores[p1]) winnerName = p2;
+
+          if (winnerName) {
+            usersData[winnerName].exp += 20; // Thắng cộng 20 EXP
+            usersData[winnerName].wins += 1;
+          }
+          // Thua hoặc hòa vẫn cộng nhẹ 5 EXP khuyến khích
+          pNames.forEach(p => {
+            if (p !== winnerName) usersData[p].exp += 5;
+          });
+          saveUserData();
+
+          io.to(roomId).emit('gameOver', {
+            matchScores: room.matchScores,
+            winner: winnerName,
+            leaderboard: getLeaderboard()
+          });
+
+          // Giải phóng phòng
+          delete rooms[roomId];
         }
       }, 3000);
     } else {
-      socket.emit('wrongAnswer', 'Sai rồi! Chọn lại đi.');
+      socket.emit('wrongAnswer', 'Sai rồi! Chọn đáp án khác xem!');
     }
   });
 
-  // Khi có người thoát/srefresh/ngắt kết nối
   socket.on('disconnect', () => {
-    if (socket.username) {
-      console.log(`${socket.username} đã thoát.`);
-      // Nếu trận đấu đang diễn ra mà có người thoát -> Reset bàn luôn để người khác vào chơi lại
-      if (players.some(p => p.id === socket.id)) {
-        io.emit('playerLeft', `${socket.username} đã rời bàn. Bàn chơi sẽ được làm mới!`);
-        resetGame();
-      }
+    let roomId = socket.roomId;
+    if (roomId && rooms[roomId]) {
+      io.to(roomId).emit('playerLeft', `${socket.username} đã rời phòng. Bàn chơi giải tán!`);
+      delete rooms[roomId];
     }
   });
 });
 
+function getLeaderboard() {
+  return Object.keys(usersData)
+    .map(name => ({
+      username: name,
+      exp: usersData[name].exp,
+      wins: usersData[name].wins,
+      rank: getRank(usersData[name].exp)
+    }))
+    .sort((a, b) => b.exp - a.exp)
+    .slice(0, 10); // Top 10
+}
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server đang chạy trên port: ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
