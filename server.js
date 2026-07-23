@@ -9,7 +9,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
 
-// Link API Google Apps Script MỚI của anh
+// Link API Google Apps Script của anh
 const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbwzhd1IGWLGPs7gUe6tYf4bC5X6xUajAFwEJGH29LU9viXuV2zXvCTfEPaL_1WL8xDZmw/exec";
 const QUESTIONS_FILE = path.join(__dirname, 'questions.json');
 
@@ -30,7 +30,6 @@ async function loadUserDataFromSheet() {
 
 async function saveUserData() {
   try {
-    // Dùng text/plain để tránh bị chặn CORS/Redirect khi post từ Server Render sang Apps Script
     await fetch(GOOGLE_SHEET_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -118,7 +117,7 @@ function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
 
-  let delay = Math.floor(Math.random() * 2000) + 1500; // Bot phản xạ từ 1.5s - 3.5s
+  let delay = Math.floor(Math.random() * 2000) + 1500; // Bot trả lời trong 1.5s - 3.5s
 
   room.botTimer = setTimeout(() => {
     if (!room || room.answered) return;
@@ -285,13 +284,16 @@ io.on('connection', (socket) => {
     }
   });
 
+  // XỬ LÝ TRẢ LỜI ĐÚNG / SAI
   socket.on('submitAnswer', (optionIndex) => {
     let roomId = socket.roomId;
     let room = rooms[roomId];
     if (!room || room.answered) return;
 
     let q = room.questions[room.currentQ];
+
     if (optionIndex === q.answer) {
+      // TRẢ LỜI ĐÚNG: Cộng 10 điểm
       room.answered = true;
       if (room.botTimer) clearTimeout(room.botTimer);
 
@@ -323,7 +325,6 @@ io.on('connection', (socket) => {
               if (p !== winnerName) usersData[p].exp = (usersData[p].exp || 0) + 5;
             });
 
-            // Lưu dữ liệu lên Google Sheets
             await saveUserData();
 
             io.to(roomId).emit('gameOver', { winner: winnerName });
@@ -335,7 +336,13 @@ io.on('connection', (socket) => {
         }
       }, 3000);
     } else {
-      socket.emit('wrongAnswer', 'Sai rồi! Chọn lại nào.');
+      // TRẢ LỜI SAI: Trừ 5 điểm (không giảm dưới 0)
+      let currentScore = room.matchScores[socket.username] || 0;
+      room.matchScores[socket.username] = Math.max(0, currentScore - 5);
+
+      // Phát thông báo điểm mới và cảnh báo sai về client
+      io.to(roomId).emit('scoreUpdate', { matchScores: room.matchScores });
+      socket.emit('wrongAnswer', 'Sai rồi! Bị trừ 5 điểm, chọn lại nào.');
     }
   });
 
