@@ -9,38 +9,41 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
 
-const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbxp24CLcxLbFX2UWzFIR9_6ZA3J80qWA__ScCytBpR7UK2g1DtTmlzIa7FXmku7PaYFTw/exec";
+// Link API Google Apps Script MỚI của anh
+const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbwzhd1IGWLGPs7gUe6tYf4bC5X6xUajAFwEJGH29LU9viXuV2zXvCTfEPaL_1WL8xDZmw/exec";
 const QUESTIONS_FILE = path.join(__dirname, 'questions.json');
 
 let usersData = {};
 
-// 1. Đồng bộ dữ liệu với Google Sheets
+// 1. Tải và Lưu dữ liệu đồng bộ với Google Sheets
 async function loadUserDataFromSheet() {
   try {
-    const res = await fetch(GOOGLE_SHEET_URL);
-    const data = await res.json();
-    usersData = data || {};
+    const res = await fetch(GOOGLE_SHEET_URL, { redirect: "follow" });
+    const text = await res.text();
+    usersData = JSON.parse(text);
     console.log("✅ Đã tải dữ liệu từ Google Sheets thành công!");
   } catch (e) {
-    console.error("❌ Lỗi khi tải dữ liệu từ Google Sheets:", e);
+    console.error("❌ Lỗi khi tải dữ liệu từ Google Sheets:", e.message);
     usersData = {};
   }
 }
 
 async function saveUserData() {
   try {
+    // Dùng text/plain để tránh bị chặn CORS/Redirect khi post từ Server Render sang Apps Script
     await fetch(GOOGLE_SHEET_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(usersData)
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(usersData),
+      redirect: "follow"
     });
     console.log("💾 Đã lưu dữ liệu lên Google Sheets thành công!");
   } catch (e) {
-    console.error("❌ Lỗi khi lưu lên Google Sheets:", e);
+    console.error("❌ Lỗi khi lưu lên Google Sheets:", e.message);
   }
 }
 
-// Khởi tạo tải dữ liệu ngay khi khởi động Server
+// Tải dữ liệu ngay khi khởi động Server
 loadUserDataFromSheet();
 
 // 2. Các hàm bổ trợ
@@ -115,7 +118,7 @@ function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
 
-  let delay = Math.floor(Math.random() * 2000) + 1500; // Bot trả lời trong 1.5s - 3.5s
+  let delay = Math.floor(Math.random() * 2000) + 1500; // Bot phản xạ từ 1.5s - 3.5s
 
   room.botTimer = setTimeout(() => {
     if (!room || room.answered) return;
@@ -159,7 +162,9 @@ async function finishPracticeGame(roomId) {
       winnerName = botName;
     }
     usersData[humanPlayer.username].exp = (usersData[humanPlayer.username].exp || 0) + 2;
-    await saveUserData(); // Lưu dữ liệu lên Google Sheets
+    
+    // Lưu điểm vĩnh viễn sang Google Sheets
+    await saveUserData();
   }
 
   io.to(roomId).emit('gameOver', { winner: winnerName });
@@ -318,7 +323,8 @@ io.on('connection', (socket) => {
               if (p !== winnerName) usersData[p].exp = (usersData[p].exp || 0) + 5;
             });
 
-            await saveUserData(); // Lưu dữ liệu lên Google Sheets
+            // Lưu dữ liệu lên Google Sheets
+            await saveUserData();
 
             io.to(roomId).emit('gameOver', { winner: winnerName });
             io.emit('leaderboardUpdate', getLeaderboard());
