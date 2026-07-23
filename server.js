@@ -14,7 +14,6 @@ const QUESTIONS_FILE = path.join(__dirname, 'questions.json');
 
 let usersData = {};
 
-// 1. Tải và Lưu dữ liệu đồng bộ với Google Sheets
 async function loadUserDataFromSheet() {
   try {
     const res = await fetch(GOOGLE_SHEET_URL, { redirect: "follow" });
@@ -43,7 +42,6 @@ async function saveUserData() {
 
 loadUserDataFromSheet();
 
-// 2. Các hàm bổ trợ
 function getQuestionsByLesson(lesson) {
   if (fs.existsSync(QUESTIONS_FILE)) {
     try {
@@ -78,6 +76,7 @@ function createRoomObject(roomId, lesson = 1) {
     matchScores: {},
     answered: false,
     isPractice: false,
+    botLevel: 'medium',
     botTimer: null,
     questions: getQuestionsByLesson(lesson)
   };
@@ -110,24 +109,34 @@ function getLeaderboard() {
     .slice(0, 10);
 }
 
-// 3. Logic Bot AI Luyện Tập (Tăng tốc độ phản xạ của Bot)
+// 🤖 Cấu hình thời gian phản xạ Bot theo 3 Cấp độ
 function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
 
-  // Bot phản xạ nhanh hơn: 0.8s - 1.8s
-  let delay = Math.floor(Math.random() * 1000) + 800; 
+  let delay = 2000;
+  let level = room.botLevel || 'medium';
+
+  if (level === 'easy') {
+    // Dễ: 3.5s - 5.5s
+    delay = Math.floor(Math.random() * 2000) + 3500;
+  } else if (level === 'hard') {
+    // Khó: 0.6s - 1.2s
+    delay = Math.floor(Math.random() * 600) + 600;
+  } else {
+    // Trung bình: 1.8s - 3.0s
+    delay = Math.floor(Math.random() * 1200) + 1800;
+  }
 
   room.botTimer = setTimeout(() => {
     if (!room || room.answered) return;
 
     room.answered = true;
-    let botName = "🤖 Bot HSK";
+    let botName = `🤖 Bot HSK (${level.toUpperCase()})`;
     room.matchScores[botName] = (room.matchScores[botName] || 0) + 10;
 
     io.to(roomId).emit('roundResult', { winner: botName, matchScores: room.matchScores });
 
-    // Rút ngắn thời gian chờ sang câu mới còn 1.2 giây
     setTimeout(() => {
       room.currentQ++;
       if (room.currentQ < room.questions.length) {
@@ -145,8 +154,8 @@ async function finishPracticeGame(roomId) {
   let room = rooms[roomId];
   if (!room) return;
 
-  let humanPlayer = room.players.find(p => p.username !== "🤖 Bot HSK");
-  let botName = "🤖 Bot HSK";
+  let botName = Object.keys(room.matchScores).find(name => name.startsWith("🤖 Bot HSK"));
+  let humanPlayer = room.players.find(p => p.username !== botName);
   let winnerName = null;
 
   if (humanPlayer) {
@@ -161,8 +170,6 @@ async function finishPracticeGame(roomId) {
       winnerName = botName;
     }
     usersData[humanPlayer.username].exp = (usersData[humanPlayer.username].exp || 0) + 2;
-    
-    // Lưu vĩnh viễn
     await saveUserData();
   }
 
@@ -171,12 +178,12 @@ async function finishPracticeGame(roomId) {
   delete rooms[roomId];
 }
 
-// 4. Socket.IO Events
 io.on('connection', (socket) => {
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
 
-  socket.on('joinPractice', ({ username, lesson }) => {
+  // Luyện tập với Bot có chọn Cấp Độ
+  socket.on('joinPractice', ({ username, lesson, botLevel }) => {
     if (!username) return;
 
     socket.username = username;
@@ -188,25 +195,31 @@ io.on('connection', (socket) => {
       saveUserData();
     }
 
+    let selectedLevel = botLevel || 'medium';
+    let botName = `🤖 Bot HSK (${selectedLevel.toUpperCase()})`;
+
     rooms[practiceRoomId] = {
       id: practiceRoomId,
       lesson: lesson || 1,
-      players: [socket, { username: "🤖 Bot HSK" }],
+      players: [socket, { username: botName }],
       currentQ: 0,
-      matchScores: { [username]: 0, "🤖 Bot HSK": 0 },
+      matchScores: { [username]: 0, [botName]: 0 },
       answered: false,
       isPractice: true,
+      botLevel: selectedLevel,
       questions: getQuestionsByLesson(lesson || 1)
     };
 
     socket.join(practiceRoomId);
+
+    let rankLabel = selectedLevel === 'easy' ? '🟢 Dễ' : selectedLevel === 'hard' ? '🔴 Khó' : '🟡 Vừa';
 
     socket.emit('gameStart', {
       roomId: practiceRoomId,
       lesson: lesson || 1,
       players: [
         { name: username, rank: getRank(usersData[username].exp || 0) },
-        { name: "🤖 Bot HSK", rank: "🤖 AI Trí Tuệ" }
+        { name: botName, rank: `AI ${rankLabel}` }
       ],
       question: rooms[practiceRoomId].questions[0]
     });
@@ -283,7 +296,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // XỬ LÝ TRẢ LỜI ĐÚNG / SAI
   socket.on('submitAnswer', (optionIndex) => {
     let roomId = socket.roomId;
     let room = rooms[roomId];
@@ -292,14 +304,12 @@ io.on('connection', (socket) => {
     let q = room.questions[room.currentQ];
 
     if (optionIndex === q.answer) {
-      // ĐÚNG: Cộng 10 điểm
       room.answered = true;
       if (room.botTimer) clearTimeout(room.botTimer);
 
       room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) + 10;
       io.to(roomId).emit('roundResult', { winner: socket.username, matchScores: room.matchScores });
 
-      // Rút ngắn thời gian chờ còn 1.2s trước khi sang câu mới
       setTimeout(async () => {
         room.currentQ++;
         if (room.currentQ < room.questions.length) {
@@ -336,11 +346,9 @@ io.on('connection', (socket) => {
         }
       }, 1200);
     } else {
-      // SAI: Trừ 5 điểm và BẮN ĐIỂM CẬP NHẬT TỨC THÌ
       let currentScore = room.matchScores[socket.username] || 0;
       room.matchScores[socket.username] = Math.max(0, currentScore - 5);
 
-      // Phát sự kiện roundResult/scoreUpdate ngay lập tức để màn hình cập nhật điểm mới
       io.to(roomId).emit('roundResult', { winner: null, matchScores: room.matchScores });
       socket.emit('wrongAnswer', 'Sai rồi! Bị trừ 5 điểm.');
     }
