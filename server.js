@@ -9,18 +9,41 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
 
-const USER_DATA_FILE = path.join(__dirname, 'users.json');
+const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbxp24CLcxLbFX2UWzFIR9_6ZA3J80qWA__ScCytBpR7UK2g1DtTmlzIa7FXmku7PaYFTw/exec";
 const QUESTIONS_FILE = path.join(__dirname, 'questions.json');
 
 let usersData = {};
-if (fs.existsSync(USER_DATA_FILE)) {
-  try { usersData = JSON.parse(fs.readFileSync(USER_DATA_FILE, 'utf8')); } catch (e) { usersData = {}; }
+
+// 1. Đồng bộ dữ liệu với Google Sheets
+async function loadUserDataFromSheet() {
+  try {
+    const res = await fetch(GOOGLE_SHEET_URL);
+    const data = await res.json();
+    usersData = data || {};
+    console.log("✅ Đã tải dữ liệu từ Google Sheets thành công!");
+  } catch (e) {
+    console.error("❌ Lỗi khi tải dữ liệu từ Google Sheets:", e);
+    usersData = {};
+  }
 }
 
-function saveUserData() {
-  fs.writeFileSync(USER_DATA_FILE, JSON.stringify(usersData, null, 2));
+async function saveUserData() {
+  try {
+    await fetch(GOOGLE_SHEET_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(usersData)
+    });
+    console.log("💾 Đã lưu dữ liệu lên Google Sheets thành công!");
+  } catch (e) {
+    console.error("❌ Lỗi khi lưu lên Google Sheets:", e);
+  }
 }
 
+// Khởi tạo tải dữ liệu ngay khi khởi động Server
+loadUserDataFromSheet();
+
+// 2. Các hàm bổ trợ
 function getQuestionsByLesson(lesson) {
   if (fs.existsSync(QUESTIONS_FILE)) {
     try {
@@ -63,7 +86,7 @@ function createRoomObject(roomId, lesson = 1) {
 function getPublicRooms() {
   let list = [];
   for (let id in rooms) {
-    if (!rooms[id].isPractice) { // Chỉ hiện các bàn P2P thường ra sảnh
+    if (!rooms[id].isPractice) {
       list.push({
         id: id,
         lesson: rooms[id].lesson,
@@ -77,17 +100,22 @@ function getPublicRooms() {
 
 function getLeaderboard() {
   return Object.keys(usersData)
-    .map(name => ({ username: name, exp: usersData[name].exp, wins: usersData[name].wins, rank: getRank(usersData[name].exp) }))
-    .sort((a, b) => b.exp - a.exp).slice(0, 10);
+    .map(name => ({
+      username: name,
+      exp: usersData[name].exp || 0,
+      wins: usersData[name].wins || 0,
+      rank: getRank(usersData[name].exp || 0)
+    }))
+    .sort((a, b) => b.exp - a.exp)
+    .slice(0, 10);
 }
 
-// Logic cho Bot tự động trả lời
+// 3. Logic Bot AI Luyện Tập
 function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
 
-  // Bot trả lời ngẫu nhiên sau 1.5 đến 3.5 giây
-  let delay = Math.floor(Math.random() * 2000) + 1500;
+  let delay = Math.floor(Math.random() * 2000) + 1500; // Bot trả lời trong 1.5s - 3.5s
 
   room.botTimer = setTimeout(() => {
     if (!room || room.answered) return;
@@ -103,7 +131,7 @@ function scheduleBotAnswer(roomId) {
       if (room.currentQ < room.questions.length) {
         room.answered = false;
         io.to(roomId).emit('nextQuestion', room.questions[room.currentQ]);
-        scheduleBotAnswer(roomId); // Đặt lịch cho câu tiếp theo
+        scheduleBotAnswer(roomId);
       } else {
         finishPracticeGame(roomId);
       }
@@ -111,7 +139,7 @@ function scheduleBotAnswer(roomId) {
   }, delay);
 }
 
-function finishPracticeGame(roomId) {
+async function finishPracticeGame(roomId) {
   let room = rooms[roomId];
   if (!room) return;
 
@@ -125,24 +153,26 @@ function finishPracticeGame(roomId) {
 
     if (pScore > bScore) {
       winnerName = humanPlayer.username;
-      usersData[humanPlayer.username].exp += 10; // Đấu với Bot cộng ít EXP hơn
-      usersData[humanPlayer.username].wins += 1;
+      usersData[humanPlayer.username].exp = (usersData[humanPlayer.username].exp || 0) + 10;
+      usersData[humanPlayer.username].wins = (usersData[humanPlayer.username].wins || 0) + 1;
     } else if (bScore > pScore) {
       winnerName = botName;
     }
-    usersData[humanPlayer.username].exp += 2;
-    saveUserData();
+    usersData[humanPlayer.username].exp = (usersData[humanPlayer.username].exp || 0) + 2;
+    await saveUserData(); // Lưu dữ liệu lên Google Sheets
   }
 
   io.to(roomId).emit('gameOver', { winner: winnerName });
-  delete rooms[roomId]; // Xóa phòng tập khi xong
+  io.emit('leaderboardUpdate', getLeaderboard());
+  delete rooms[roomId];
 }
 
+// 4. Socket.IO Events
 io.on('connection', (socket) => {
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
 
-  // Chế độ TỰ LUYỆN TẬP VỚI BOT
+  // Luyện tập với Bot
   socket.on('joinPractice', ({ username, lesson }) => {
     if (!username) return;
 
@@ -155,7 +185,6 @@ io.on('connection', (socket) => {
       saveUserData();
     }
 
-    // Tạo phòng luyện tập riêng
     rooms[practiceRoomId] = {
       id: practiceRoomId,
       lesson: lesson || 1,
@@ -169,12 +198,11 @@ io.on('connection', (socket) => {
 
     socket.join(practiceRoomId);
 
-    // Bắt đầu game ngay lập tức
     socket.emit('gameStart', {
       roomId: practiceRoomId,
       lesson: lesson || 1,
       players: [
-        { name: username, rank: getRank(usersData[username].exp) },
+        { name: username, rank: getRank(usersData[username].exp || 0) },
         { name: "🤖 Bot HSK", rank: "🤖 AI Trí Tuệ" }
       ],
       question: rooms[practiceRoomId].questions[0]
@@ -229,7 +257,10 @@ io.on('connection', (socket) => {
       io.to(roomId).emit('gameStart', {
         roomId: roomId,
         lesson: room.lesson,
-        players: room.players.map(p => ({ name: p.username, rank: getRank(usersData[p.username].exp) })),
+        players: room.players.map(p => ({
+          name: p.username,
+          rank: getRank(usersData[p.username]?.exp || 0)
+        })),
         question: room.questions[room.currentQ]
       });
     } else {
@@ -257,12 +288,12 @@ io.on('connection', (socket) => {
     let q = room.questions[room.currentQ];
     if (optionIndex === q.answer) {
       room.answered = true;
-      if (room.botTimer) clearTimeout(room.botTimer); // Hủy đếm giờ trả lời của Bot nếu người chơi thắng câu này
+      if (room.botTimer) clearTimeout(room.botTimer);
 
       room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) + 10;
       io.to(roomId).emit('roundResult', { winner: socket.username, matchScores: room.matchScores });
 
-      setTimeout(() => {
+      setTimeout(async () => {
         room.currentQ++;
         if (room.currentQ < room.questions.length) {
           room.answered = false;
@@ -270,7 +301,7 @@ io.on('connection', (socket) => {
           if (room.isPractice) scheduleBotAnswer(roomId);
         } else {
           if (room.isPractice) {
-            finishPracticeGame(roomId);
+            await finishPracticeGame(roomId);
           } else {
             let pNames = room.players.map(p => p.username);
             let p1 = pNames[0], p2 = pNames[1];
@@ -279,11 +310,19 @@ io.on('connection', (socket) => {
             if (room.matchScores[p1] > room.matchScores[p2]) winnerName = p1;
             else if (room.matchScores[p2] > room.matchScores[p1]) winnerName = p2;
 
-            if (winnerName) { usersData[winnerName].exp += 20; usersData[winnerName].wins += 1; }
-            pNames.forEach(p => { if (p !== winnerName) usersData[p].exp += 5; });
-            saveUserData();
+            if (winnerName) {
+              usersData[winnerName].exp = (usersData[winnerName].exp || 0) + 20;
+              usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
+            }
+            pNames.forEach(p => {
+              if (p !== winnerName) usersData[p].exp = (usersData[p].exp || 0) + 5;
+            });
+
+            await saveUserData(); // Lưu dữ liệu lên Google Sheets
 
             io.to(roomId).emit('gameOver', { winner: winnerName });
+            io.emit('leaderboardUpdate', getLeaderboard());
+
             createRoomObject(roomId, room.lesson);
             io.emit('roomListUpdate', getPublicRooms());
           }
