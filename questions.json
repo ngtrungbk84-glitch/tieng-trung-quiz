@@ -1,13 +1,16 @@
 {
   "1": [
+    { "q": "Pinyin của '苹果' (Quả táo) là gì?", "options": ["Míngtiān", "Píngguǒ", "Shuǐguǒ", "Chéngzi"], "answer": 1 },
     { "q": "Từ nào nghĩa là 'Cảm ơn'?", "options": ["你好 (Nǐ hǎo)", "谢谢 (Xièxie)", "再见 (Zàijiàn)", "对不起 (Duìbuqǐ)"], "answer": 1 },
     { "q": "Pinyin của '你好' là gì?", "options": ["Nǐ hǎo", "Xièxie", "Zàijiàn", "Duìbuqǐ"], "answer": 0 }
   ],
   "2": [
+    { "q": "Từ nào nghĩa là 'Cảm ơn'?", "options": ["你好 (Nǐ hǎo)", "谢谢 (Xièxie)", "再见 (Zàijiàn)", "对不起 (Duìbuqǐ)"], "answer": 1 },
     { "q": "Từ nào nghĩa là 'Tạm biệt'?", "options": ["再见 (Zàijiàn)", "谢谢 (Xièxie)", "不客气 (Bú kèqi)", "好的 (Hǎo de)"], "answer": 0 },
     { "q": "Từ '老师' nghĩa là gì?", "options": ["Học sinh", "Bác sĩ", "Giáo viên", "Cảnh sát"], "answer": 2 }
   ],
   "3": [
+    { "q": "Từ nào nghĩa là 'Cảm ơn'?", "options": ["你好 (Nǐ hǎo)", "谢谢 (Xièxie)", "再见 (Zàijiàn)", "对不起 (Duìbuqǐ)"], "answer": 1 },
     { "q": "Pinyin của '苹果' (Quả táo) là gì?", "options": ["Míngtiān", "Píngguǒ", "Shuǐguǒ", "Chéngzi"], "answer": 1 },
     { "q": "Từ nào nghĩa là 'Nước'?", "options": ["茶 (Chá)", "酒 (Jiǔ)", "水 (Shuǐ)", "奶 (Nǎi)"], "answer": 2 }
   ]
