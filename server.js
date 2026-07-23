@@ -39,11 +39,11 @@ function getRank(exp) {
   return "🌱 Tân thủ";
 }
 
-// KHỞI TẠO DỰ LIỆU BÀN CHƠI
-let roomCounter = 5; // Số bàn hiện tại
+// KHỞI TẠO DỮ LIỆU BÀN CHƠI
+let roomCounter = 5; // Khởi đầu với 5 bàn
 let rooms = {};
 
-// Tạo sẵn 5 bàn mặc định khi server chạy
+// Tạo sẵn 5 bàn mặc định
 for (let i = 1; i <= 5; i++) {
   createRoomObject(`Bàn ${i}`);
 }
@@ -59,7 +59,6 @@ function createRoomObject(roomId) {
   };
 }
 
-// Trả về danh sách bàn chơi công khai gọn nhẹ cho client
 function getPublicRooms() {
   let list = [];
   for (let id in rooms) {
@@ -85,16 +84,20 @@ function getLeaderboard() {
 }
 
 io.on('connection', (socket) => {
-  // Khi người dùng mới vào: Gửi danh sách bàn + Bảng xếp hạng
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
 
-  // Nút Mở Bàn Mới
+  // Nút Mở Bàn Mới (Giới hạn tối đa 10 bàn)
   socket.on('createNewRoom', () => {
+    const currentRoomCount = Object.keys(rooms).length;
+    if (currentRoomCount >= 10) {
+      socket.emit('notice', 'Sảnh đã đạt giới hạn tối đa 10 bàn!');
+      return;
+    }
+
     roomCounter++;
     let newRoomId = `Bàn ${roomCounter}`;
     createRoomObject(newRoomId);
-    // Cập nhật cho TẤT CẢ người dùng đang ở trang chủ
     io.emit('roomListUpdate', getPublicRooms());
   });
 
@@ -125,7 +128,6 @@ io.on('connection', (socket) => {
     room.players.push(socket);
     room.matchScores[username] = 0;
 
-    // Phát tín hiệu cập nhật trạng thái bàn ra sảnh ngoài
     io.emit('roomListUpdate', getPublicRooms());
 
     if (room.players.length === 2) {
@@ -166,7 +168,7 @@ io.on('connection', (socket) => {
           room.answered = false;
           io.to(roomId).emit('nextQuestion', room.questions[room.currentQ]);
         } else {
-          // Kết thúc ván
+          // Hết ván
           let pNames = room.players.map(p => p.username);
           let p1 = pNames[0], p2 = pNames[1];
           let winnerName = null;
@@ -183,7 +185,7 @@ io.on('connection', (socket) => {
 
           io.to(roomId).emit('gameOver', { winner: winnerName });
 
-          // Reset lại bàn chơi này về trạng thái trống
+          // Reset bàn chơi
           createRoomObject(roomId);
           io.emit('roomListUpdate', getPublicRooms());
         }
@@ -198,7 +200,6 @@ io.on('connection', (socket) => {
     let roomId = socket.roomId;
     if (roomId && rooms[roomId]) {
       io.to(roomId).emit('playerLeft', `${socket.username} đã rời bàn.`);
-      // Reset lại bàn chơi khi có người out
       createRoomObject(roomId);
       io.emit('roomListUpdate', getPublicRooms());
     }
