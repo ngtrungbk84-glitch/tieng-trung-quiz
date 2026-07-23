@@ -119,13 +119,13 @@ function scheduleBotAnswer(roomId) {
 
   if (level === 'easy') {
     // Dễ: 3.5s - 5.5s
-    delay = Math.floor(Math.random() * 2000) + 3500;
+    delay = Math.floor(Math.random() * 6000) + 8000;
   } else if (level === 'hard') {
     // Khó: 0.6s - 1.2s
-    delay = Math.floor(Math.random() * 600) + 600;
+    delay = Math.floor(Math.random() * 1500) + 2500;
   } else {
     // Trung bình: 1.8s - 3.0s
-    delay = Math.floor(Math.random() * 1200) + 1800;
+    delay = Math.floor(Math.random() * 3000) + 5000;
   }
 
   room.botTimer = setTimeout(() => {
