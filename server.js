@@ -11,11 +11,10 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-// File lưu điểm tích lũy & câu hỏi
 const USER_DATA_FILE = path.join(__dirname, 'users.json');
 const QUESTIONS_FILE = path.join(__dirname, 'questions.json');
 
-// Đọc dữ liệu user
+// Đọc dữ liệu User & Câu hỏi
 let usersData = {};
 if (fs.existsSync(USER_DATA_FILE)) {
   try { usersData = JSON.parse(fs.readFileSync(USER_DATA_FILE, 'utf8')); } catch (e) { usersData = {}; }
@@ -25,7 +24,6 @@ function saveUserData() {
   fs.writeFileSync(USER_DATA_FILE, JSON.stringify(usersData, null, 2));
 }
 
-// Đọc danh sách câu hỏi từ file questions.json
 function getQuestions() {
   if (fs.existsSync(QUESTIONS_FILE)) {
     try { return JSON.parse(fs.readFileSync(QUESTIONS_FILE, 'utf8')); } catch (e) { return []; }
@@ -33,7 +31,6 @@ function getQuestions() {
   return [];
 }
 
-// Tính Cấp độ / Rank dựa trên tổng điểm
 function getRank(exp) {
   if (exp >= 500) return "🐉 HSK Master";
   if (exp >= 200) return "🥇 Cao thủ HSK";
@@ -42,42 +39,85 @@ function getRank(exp) {
   return "🌱 Tân thủ";
 }
 
-// Quản lý danh sách các phòng chơi
-// Cấu trúc: rooms[roomId] = { players: [], currentQ: 0, scores: {}, answered: false, questions: [] }
+// KHỞI TẠO DỰ LIỆU BÀN CHƠI
+let roomCounter = 5; // Số bàn hiện tại
 let rooms = {};
 
-io.on('connection', (socket) => {
+// Tạo sẵn 5 bàn mặc định khi server chạy
+for (let i = 1; i <= 5; i++) {
+  createRoomObject(`Bàn ${i}`);
+}
 
-  // Gửi bảng xếp hạng khi người dùng kết nối
+function createRoomObject(roomId) {
+  rooms[roomId] = {
+    id: roomId,
+    players: [],
+    currentQ: 0,
+    matchScores: {},
+    answered: false,
+    questions: getQuestions()
+  };
+}
+
+// Trả về danh sách bàn chơi công khai gọn nhẹ cho client
+function getPublicRooms() {
+  let list = [];
+  for (let id in rooms) {
+    list.push({
+      id: id,
+      playerCount: rooms[id].players.length,
+      players: rooms[id].players.map(p => p.username)
+    });
+  }
+  return list;
+}
+
+function getLeaderboard() {
+  return Object.keys(usersData)
+    .map(name => ({
+      username: name,
+      exp: usersData[name].exp,
+      wins: usersData[name].wins,
+      rank: getRank(usersData[name].exp)
+    }))
+    .sort((a, b) => b.exp - a.exp)
+    .slice(0, 10);
+}
+
+io.on('connection', (socket) => {
+  // Khi người dùng mới vào: Gửi danh sách bàn + Bảng xếp hạng
+  socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
 
+  // Nút Mở Bàn Mới
+  socket.on('createNewRoom', () => {
+    roomCounter++;
+    let newRoomId = `Bàn ${roomCounter}`;
+    createRoomObject(newRoomId);
+    // Cập nhật cho TẤT CẢ người dùng đang ở trang chủ
+    io.emit('roomListUpdate', getPublicRooms());
+  });
+
+  // Tham gia Bàn chơi
   socket.on('joinRoom', ({ username, roomId }) => {
-    roomId = roomId.trim().toUpperCase() || 'PHONG-1';
+    if (!username) return;
+
     socket.username = username;
     socket.roomId = roomId;
 
-    // Khởi tạo user nếu chưa có trong DB
     if (!usersData[username]) {
       usersData[username] = { exp: 0, wins: 0 };
       saveUserData();
     }
 
-    // Khởi tạo phòng nếu chưa có
-    if (!rooms[roomId]) {
-      rooms[roomId] = {
-        players: [],
-        currentQ: 0,
-        matchScores: {},
-        answered: false,
-        questions: getQuestions()
-      };
+    let room = rooms[roomId];
+    if (!room) {
+      socket.emit('waiting', 'Bàn chơi không tồn tại!');
+      return;
     }
 
-    let room = rooms[roomId];
-
-    // Kiểm tra số lượng người trong phòng
     if (room.players.length >= 2) {
-      socket.emit('waiting', `Phòng ${roomId} đã đầy (tối đa 2 người). Vui lòng chọn phòng khác!`);
+      socket.emit('waiting', `Bàn [${roomId}] đã đầy! Vui lòng chọn bàn khác.`);
       return;
     }
 
@@ -85,7 +125,8 @@ io.on('connection', (socket) => {
     room.players.push(socket);
     room.matchScores[username] = 0;
 
-    console.log(`${username} vào phòng [${roomId}]`);
+    // Phát tín hiệu cập nhật trạng thái bàn ra sảnh ngoài
+    io.emit('roomListUpdate', getPublicRooms());
 
     if (room.players.length === 2) {
       room.currentQ = 0;
@@ -94,16 +135,16 @@ io.on('connection', (socket) => {
         roomId: roomId,
         players: room.players.map(p => ({
           name: p.username,
-          rank: getRank(usersData[p.username].exp),
-          exp: usersData[p.username].exp
+          rank: getRank(usersData[p.username].exp)
         })),
         question: room.questions[room.currentQ]
       });
     } else {
-      socket.emit('waiting', `Đã vào phòng [${roomId}]. Đang chờ người chơi thứ 2...`);
+      socket.emit('waiting', `Đã vào [${roomId}]. Đang chờ đối thủ...`);
     }
   });
 
+  // Trả lời câu hỏi
   socket.on('submitAnswer', (optionIndex) => {
     let roomId = socket.roomId;
     let room = rooms[roomId];
@@ -116,8 +157,7 @@ io.on('connection', (socket) => {
 
       io.to(roomId).emit('roundResult', {
         winner: socket.username,
-        matchScores: room.matchScores,
-        correctAnswer: q.options[q.answer]
+        matchScores: room.matchScores
       });
 
       setTimeout(() => {
@@ -126,7 +166,7 @@ io.on('connection', (socket) => {
           room.answered = false;
           io.to(roomId).emit('nextQuestion', room.questions[room.currentQ]);
         } else {
-          // Kết thúc trận -> Cộng điểm tích lũy thăng hạng
+          // Kết thúc ván
           let pNames = room.players.map(p => p.username);
           let p1 = pNames[0], p2 = pNames[1];
           let winnerName = null;
@@ -135,50 +175,35 @@ io.on('connection', (socket) => {
           else if (room.matchScores[p2] > room.matchScores[p1]) winnerName = p2;
 
           if (winnerName) {
-            usersData[winnerName].exp += 20; // Thắng cộng 20 EXP
+            usersData[winnerName].exp += 20;
             usersData[winnerName].wins += 1;
           }
-          // Thua hoặc hòa vẫn cộng nhẹ 5 EXP khuyến khích
-          pNames.forEach(p => {
-            if (p !== winnerName) usersData[p].exp += 5;
-          });
+          pNames.forEach(p => { if (p !== winnerName) usersData[p].exp += 5; });
           saveUserData();
 
-          io.to(roomId).emit('gameOver', {
-            matchScores: room.matchScores,
-            winner: winnerName,
-            leaderboard: getLeaderboard()
-          });
+          io.to(roomId).emit('gameOver', { winner: winnerName });
 
-          // Giải phóng phòng
-          delete rooms[roomId];
+          // Reset lại bàn chơi này về trạng thái trống
+          createRoomObject(roomId);
+          io.emit('roomListUpdate', getPublicRooms());
         }
       }, 3000);
     } else {
-      socket.emit('wrongAnswer', 'Sai rồi! Chọn đáp án khác xem!');
+      socket.emit('wrongAnswer', 'Sai rồi! Chọn lại nào.');
     }
   });
 
+  // Ngắt kết nối / Rời bàn
   socket.on('disconnect', () => {
     let roomId = socket.roomId;
     if (roomId && rooms[roomId]) {
-      io.to(roomId).emit('playerLeft', `${socket.username} đã rời phòng. Bàn chơi giải tán!`);
-      delete rooms[roomId];
+      io.to(roomId).emit('playerLeft', `${socket.username} đã rời bàn.`);
+      // Reset lại bàn chơi khi có người out
+      createRoomObject(roomId);
+      io.emit('roomListUpdate', getPublicRooms());
     }
   });
 });
-
-function getLeaderboard() {
-  return Object.keys(usersData)
-    .map(name => ({
-      username: name,
-      exp: usersData[name].exp,
-      wins: usersData[name].wins,
-      rank: getRank(usersData[name].exp)
-    }))
-    .sort((a, b) => b.exp - a.exp)
-    .slice(0, 10); // Top 10
-}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
