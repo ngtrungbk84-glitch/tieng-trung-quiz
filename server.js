@@ -14,6 +14,7 @@ const QUESTIONS_FILE = path.join(__dirname, 'questions.json');
 
 let usersData = {};
 
+// Tải dữ liệu từ Google Sheets lúc khởi động
 async function loadUserDataFromSheet() {
   try {
     const res = await fetch(GOOGLE_SHEET_URL, { redirect: "follow" });
@@ -26,18 +27,15 @@ async function loadUserDataFromSheet() {
   }
 }
 
-async function saveUserData() {
-  try {
-    await fetch(GOOGLE_SHEET_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(usersData),
-      redirect: "follow"
-    });
-    console.log("💾 Đã lưu dữ liệu lên Google Sheets thành công!");
-  } catch (e) {
-    console.error("❌ Lỗi khi lưu lên Google Sheets:", e.message);
-  }
+// Lưu dữ liệu ngầm (KHÔNG xài await để tránh chặn luồng chơi game)
+function saveUserDataAsync() {
+  fetch(GOOGLE_SHEET_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(usersData),
+    redirect: "follow"
+  }).then(() => console.log("💾 Đã đồng bộ Sheet ngầm thành công!"))
+    .catch(e => console.error("❌ Lỗi lưu Sheet ngầm:", e.message));
 }
 
 loadUserDataFromSheet();
@@ -125,16 +123,12 @@ function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
 
-  let delay = 6000;
+  let delay = 5000;
   let level = room.botLevel || 'medium';
 
-  if (level === 'easy') {
-    delay = Math.floor(Math.random() * 6000) + 8000;
-  } else if (level === 'hard') {
-    delay = Math.floor(Math.random() * 1500) + 2500;
-  } else {
-    delay = Math.floor(Math.random() * 3000) + 5000;
-  }
+  if (level === 'easy') delay = Math.floor(Math.random() * 5000) + 7000;
+  else if (level === 'hard') delay = Math.floor(Math.random() * 1500) + 2000;
+  else delay = Math.floor(Math.random() * 3000) + 4000;
 
   room.botTimer = setTimeout(() => {
     if (!room || room.answered) return;
@@ -161,11 +155,11 @@ function scheduleBotAnswer(roomId) {
       } else {
         finishPracticeGame(roomId);
       }
-    }, 1500);
+    }, 1200);
   }, delay);
 }
 
-async function finishPracticeGame(roomId) {
+function finishPracticeGame(roomId) {
   let room = rooms[roomId];
   if (!room) return;
 
@@ -183,7 +177,7 @@ async function finishPracticeGame(roomId) {
     } else if (bScore > pScore) {
       winnerName = botName;
     }
-    await saveUserData();
+    saveUserDataAsync();
   }
 
   io.to(roomId).emit('gameOver', { winner: winnerName });
@@ -204,7 +198,7 @@ io.on('connection', (socket) => {
 
     if (!usersData[username]) {
       usersData[username] = { exp: 0, wins: 0 };
-      saveUserData();
+      saveUserDataAsync();
     }
 
     let selectedLevel = botLevel || 'medium';
@@ -266,7 +260,7 @@ io.on('connection', (socket) => {
 
     if (!usersData[username]) {
       usersData[username] = { exp: 0, wins: 0 };
-      saveUserData();
+      saveUserDataAsync();
     }
 
     let room = rooms[roomId];
@@ -308,15 +302,18 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('submitAnswer', async (optionIndex) => {
+  // 🎯 XỬ LÝ TRẢ LỜI SIÊU TỐC (Mili-giây)
+  socket.on('submitAnswer', (optionIndex) => {
     let roomId = socket.roomId;
     let room = rooms[roomId];
-    if (!room || room.answered) return;
+    if (!room || room.answered) return; // Nếu đã có người trả lời đúng câu này rồi -> Bỏ qua
 
     let q = room.questions[room.currentQ];
+    if (!q) return;
 
     if (optionIndex === q.answer) {
-      room.answered = true;
+      // ✅ Trả lời ĐÚNG & Nhanh nhất!
+      room.answered = true; // Khóa câu hỏi ngay lập tức
       if (room.botTimer) clearTimeout(room.botTimer);
 
       let pointsEarned = 0;
@@ -347,17 +344,19 @@ io.on('connection', (socket) => {
         }
       }
 
-      await saveUserData();
-      io.emit('leaderboardUpdate', getLeaderboard());
-
-      // Gửi về thông tin correctIndex để đổi màu XANH
+      // Phát tín hiệu Đổi màu XANH tức thì cho toàn bộ phòng
       io.to(roomId).emit('roundResult', { 
         winner: socket.username, 
         matchScores: room.matchScores,
         correctIndex: q.answer
       });
 
-      setTimeout(async () => {
+      // Lưu ngầm và cập nhật xếp hạng
+      saveUserDataAsync();
+      io.emit('leaderboardUpdate', getLeaderboard());
+
+      // Chuyển sang câu tiếp theo
+      setTimeout(() => {
         room.currentQ++;
         if (room.currentQ < room.questions.length) {
           room.answered = false;
@@ -365,7 +364,7 @@ io.on('connection', (socket) => {
           if (room.isPractice) scheduleBotAnswer(roomId);
         } else {
           if (room.isPractice) {
-            await finishPracticeGame(roomId);
+            finishPracticeGame(roomId);
           } else {
             let pNames = room.players.map(p => p.username);
             let p1 = pNames[0], p2 = pNames[1];
@@ -378,7 +377,7 @@ io.on('connection', (socket) => {
               usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
             }
 
-            await saveUserData();
+            saveUserDataAsync();
 
             io.to(roomId).emit('gameOver', { winner: winnerName });
             io.emit('leaderboardUpdate', getLeaderboard());
@@ -387,8 +386,10 @@ io.on('connection', (socket) => {
             io.emit('roomListUpdate', getPublicRooms());
           }
         }
-      }, 1500);
+      }, 1200);
+
     } else {
+      // ❌ Trả lời SAI
       let deductPoints = room.isPractice 
         ? getBotModePoints(room.lesson, room.botLevel) 
         : getBasePoints(room.lesson);
@@ -401,11 +402,11 @@ io.on('connection', (socket) => {
       let currentScore = room.matchScores[socket.username] || 0;
       room.matchScores[socket.username] = Math.max(0, currentScore - deductPoints);
 
-      await saveUserData();
+      saveUserDataAsync();
       io.emit('leaderboardUpdate', getLeaderboard());
 
       io.to(roomId).emit('roundResult', { winner: null, matchScores: room.matchScores });
-      socket.emit('wrongAnswer', `Sai rồi! Bị trừ ${deductPoints} EXP.`);
+      socket.emit('wrongAnswer', { index: optionIndex, msg: `Sai rồi! Bị trừ ${deductPoints} EXP.` });
     }
   });
 
