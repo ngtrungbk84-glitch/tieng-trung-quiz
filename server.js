@@ -60,18 +60,18 @@ function getRank(exp) {
   return "🌱 Tân thủ";
 }
 
-// 🎯 Hàm tính Điểm Cơ Bản theo Lesson (Lesson 1 = 10, Lesson 2 = 15, v.v...)
+// 🎯 Tính Điểm Cơ Bản theo Lesson (Lesson 1 = 10, Lesson 2 = 15, v.v...)
 function getBasePoints(lesson) {
   let l = parseInt(lesson) || 1;
   return 10 + (l - 1) * 5;
 }
 
-// 🤖 Hàm tính Điểm cho Bot/Người khi đấu với Bot dựa theo Cấp độ
+// 🤖 Tính Điểm theo Cấp độ Bot
 function getBotModePoints(lesson, botLevel) {
   let base = getBasePoints(lesson);
-  if (botLevel === 'easy') return Math.round(base * 0.5);   // Dễ: 1/2 điểm cơ bản
-  if (botLevel === 'hard') return Math.round(base * 1.5);   // Khó: 1.5 lần điểm cơ bản
-  return base;                                             // Trung bình: 1.0 lần
+  if (botLevel === 'easy') return Math.round(base * 0.5);   // Dễ: 1/2
+  if (botLevel === 'hard') return Math.round(base * 1.5);   // Khó: 1.5 lần
+  return base;                                             // Vừa: 1.0
 }
 
 let roomCounter = 5;
@@ -132,11 +132,11 @@ function scheduleBotAnswer(roomId) {
   let level = room.botLevel || 'medium';
 
   if (level === 'easy') {
-    delay = Math.floor(Math.random() * 6000) + 8000; // 8.0s - 14.0s
+    delay = Math.floor(Math.random() * 6000) + 8000; // 8s - 14s
   } else if (level === 'hard') {
-    delay = Math.floor(Math.random() * 1500) + 2500; // 2.5s - 4.0s
+    delay = Math.floor(Math.random() * 1500) + 2500; // 2.5s - 4s
   } else {
-    delay = Math.floor(Math.random() * 3000) + 5000; // 5.0s - 8.0s
+    delay = Math.floor(Math.random() * 3000) + 5000; // 5s - 8s
   }
 
   room.botTimer = setTimeout(() => {
@@ -145,11 +145,10 @@ function scheduleBotAnswer(roomId) {
     room.answered = true;
     let botName = `🤖 Bot HSK (${level.toUpperCase()})`;
     
-    // Cộng điểm cho Bot theo hệ số cấp độ
     let points = getBotModePoints(room.lesson, level);
     room.matchScores[botName] = (room.matchScores[botName] || 0) + points;
 
-    io.to(roomId).emit('roundResult', { winner: botName, matchScores: room.matchScores, pointsEarned: points });
+    io.to(roomId).emit('roundResult', { winner: botName, matchScores: room.matchScores });
 
     setTimeout(() => {
       room.currentQ++;
@@ -170,24 +169,18 @@ async function finishPracticeGame(roomId) {
 
   let botName = Object.keys(room.matchScores).find(name => name.startsWith("🤖 Bot HSK"));
   let humanPlayer = room.players.find(p => p.username !== botName);
-  let winnerName = null;
 
-  if (humanPlayer) {
+  if (humanPlayer && usersData[humanPlayer.username]) {
     let pScore = room.matchScores[humanPlayer.username] || 0;
     let bScore = room.matchScores[botName] || 0;
 
     if (pScore > bScore) {
-      winnerName = humanPlayer.username;
-      usersData[humanPlayer.username].exp = (usersData[humanPlayer.username].exp || 0) + 10;
       usersData[humanPlayer.username].wins = (usersData[humanPlayer.username].wins || 0) + 1;
-    } else if (bScore > pScore) {
-      winnerName = botName;
     }
-    usersData[humanPlayer.username].exp = (usersData[humanPlayer.username].exp || 0) + 2;
     await saveUserData();
   }
 
-  io.to(roomId).emit('gameOver', { winner: winnerName });
+  io.to(roomId).emit('gameOver', { winner: room.matchScores[humanPlayer?.username] > room.matchScores[botName] ? humanPlayer?.username : botName });
   io.emit('leaderboardUpdate', getLeaderboard());
   delete rooms[roomId];
 }
@@ -196,7 +189,6 @@ io.on('connection', (socket) => {
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
 
-  // Luyện tập với Bot
   socket.on('joinPractice', ({ username, lesson, botLevel }) => {
     if (!username) return;
 
@@ -310,8 +302,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 🎯 Xử lý trả lời câu hỏi & Cộng/Trừ điểm
-  socket.on('submitAnswer', (optionIndex) => {
+  // 🎯 Xử lý trả lời & Trừ/Cộng EXP Server ngay lập tức!
+  socket.on('submitAnswer', async (optionIndex) => {
     let roomId = socket.roomId;
     let room = rooms[roomId];
     if (!room || room.answered) return;
@@ -325,28 +317,42 @@ io.on('connection', (socket) => {
       let pointsEarned = 0;
 
       if (room.isPractice) {
-        // Đấu với Bot -> Tính điểm theo Hệ số Cấp Độ Bot
+        // Đấu với Bot -> Cộng EXP Server dựa trên cấp độ Bot
         pointsEarned = getBotModePoints(room.lesson, room.botLevel);
         room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) + pointsEarned;
+        
+        if (usersData[socket.username]) {
+          usersData[socket.username].exp = (usersData[socket.username].exp || 0) + pointsEarned;
+        }
       } else {
-        // Đấu 1v1 -> Người thắng CỘNG điểm cơ bản, Người thua TRỪ điểm cơ bản (Cướp điểm)
+        // Đấu 1v1 -> Cướp điểm EXP Server!
         pointsEarned = getBasePoints(room.lesson);
 
-        // Cộng điểm người thắng
+        // Cộng cho người thắng
         room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) + pointsEarned;
+        if (usersData[socket.username]) {
+          usersData[socket.username].exp = (usersData[socket.username].exp || 0) + pointsEarned;
+        }
 
-        // Trừ điểm người đối diện (không để điểm âm)
+        // Lấy (Trừ) điểm của người thua trên Server
         let otherPlayer = room.players.find(p => p.username !== socket.username);
-        if (otherPlayer) {
-          let oldScore = room.matchScores[otherPlayer.username] || 0;
-          room.matchScores[otherPlayer.username] = Math.max(0, oldScore - pointsEarned);
+        if (otherPlayer && usersData[otherPlayer.username]) {
+          let oldExp = usersData[otherPlayer.username].exp || 0;
+          let actualDeduct = Math.min(oldExp, pointsEarned); // Không để EXP tổng bị âm
+          usersData[otherPlayer.username].exp = oldExp - actualDeduct;
+
+          let oldMatchScore = room.matchScores[otherPlayer.username] || 0;
+          room.matchScores[otherPlayer.username] = Math.max(0, oldMatchScore - pointsEarned);
         }
       }
 
+      // Lưu lại dữ liệu lên Sheet & Cập nhật Bảng Xếp Hạng
+      await saveUserData();
+      io.emit('leaderboardUpdate', getLeaderboard());
+
       io.to(roomId).emit('roundResult', { 
         winner: socket.username, 
-        matchScores: room.matchScores,
-        pointsEarned: pointsEarned
+        matchScores: room.matchScores
       });
 
       setTimeout(async () => {
@@ -366,13 +372,9 @@ io.on('connection', (socket) => {
             if (room.matchScores[p1] > room.matchScores[p2]) winnerName = p1;
             else if (room.matchScores[p2] > room.matchScores[p1]) winnerName = p2;
 
-            if (winnerName) {
-              usersData[winnerName].exp = (usersData[winnerName].exp || 0) + 20;
+            if (winnerName && usersData[winnerName]) {
               usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
             }
-            pNames.forEach(p => {
-              if (p !== winnerName) usersData[p].exp = (usersData[p].exp || 0) + 5;
-            });
 
             await saveUserData();
 
@@ -385,16 +387,24 @@ io.on('connection', (socket) => {
         }
       }, 1200);
     } else {
-      // Khi chọn SAI
-      let basePoints = room.isPractice 
+      // Khi chọn SAI -> Bị trừ EXP Server
+      let deductPoints = room.isPractice 
         ? getBotModePoints(room.lesson, room.botLevel) 
         : getBasePoints(room.lesson);
 
+      if (usersData[socket.username]) {
+        let oldExp = usersData[socket.username].exp || 0;
+        usersData[socket.username].exp = Math.max(0, oldExp - deductPoints);
+      }
+
       let currentScore = room.matchScores[socket.username] || 0;
-      room.matchScores[socket.username] = Math.max(0, currentScore - basePoints);
+      room.matchScores[socket.username] = Math.max(0, currentScore - deductPoints);
+
+      await saveUserData();
+      io.emit('leaderboardUpdate', getLeaderboard());
 
       io.to(roomId).emit('roundResult', { winner: null, matchScores: room.matchScores });
-      socket.emit('wrongAnswer', `Sai rồi! Bị trừ ${basePoints} điểm.`);
+      socket.emit('wrongAnswer', `Sai rồi! Bạn bị trừ ${deductPoints} EXP trên Server.`);
     }
   });
 
