@@ -59,10 +59,10 @@ function getRank(exp) {
   return "🌱 Tân thủ";
 }
 
-// 🎯 TÍNH ĐIỂM CƠ BẢN THEO BÀI (Bài 1 = 10, mỗi bài sau +5)
+// 🎯 TÍNH ĐIỂM CƠ BẢN THEO BÀI (Tất cả được làm tròn lên số nguyên)
 function getBasePoints(lesson) {
   let l = parseInt(lesson) || 1;
-  return 10 + (l - 1) * 5;
+  return Math.ceil(10 + (l - 1) * 5);
 }
 
 let roomCounter = 5;
@@ -106,9 +106,9 @@ function getLeaderboard() {
   return Object.keys(usersData)
     .map(name => ({
       username: name,
-      exp: usersData[name].exp || 0,
+      exp: Math.ceil(usersData[name].exp || 0),
       wins: usersData[name].wins || 0,
-      rank: getRank(usersData[name].exp || 0)
+      rank: getRank(Math.ceil(usersData[name].exp || 0))
     }))
     .sort((a, b) => b.exp - a.exp)
     .slice(0, 10);
@@ -133,8 +133,8 @@ function scheduleBotAnswer(roomId) {
     let botName = `🤖 Bot HSK (${level.toUpperCase()})`;
     let q = room.questions[room.currentQ];
 
-    // Bot bấm đúng: +10 điểm trận đấu
-    room.matchScores[botName] = (room.matchScores[botName] || 0) + 10;
+    // Bot bấm đúng: +10 điểm trận đấu (Số nguyên)
+    room.matchScores[botName] = Math.ceil((room.matchScores[botName] || 0) + 10);
 
     io.to(roomId).emit('roundResult', { 
       winner: botName, 
@@ -173,16 +173,18 @@ function finishPracticeGame(roomId) {
       winnerName = humanPlayer.username;
       usersData[humanPlayer.username].wins = (usersData[humanPlayer.username].wins || 0) + 1;
 
-      // THẮNG BOT: Tính điểm thưởng EXP theo cấp độ Bot
-      let earnedExp = basePoints;
-      if (room.botLevel === 'easy') earnedExp = Math.round(basePoints * 0.5);
-      else if (room.botLevel === 'hard') earnedExp = Math.round(basePoints * 1.5);
+      // 🎯 THẮNG BOT: Tính điểm theo tỷ lệ 20% - 40% - 60% và làm tròn lên
+      let rate = 0.4; // Mặc định vừa (40%)
+      if (room.botLevel === 'easy') rate = 0.2;       // Dễ (20%)
+      else if (room.botLevel === 'hard') rate = 0.6;  // Khó (60%)
 
-      usersData[humanPlayer.username].exp = (usersData[humanPlayer.username].exp || 0) + earnedExp;
+      let earnedExp = Math.ceil(basePoints * rate);
+
+      usersData[humanPlayer.username].exp = Math.ceil((usersData[humanPlayer.username].exp || 0) + earnedExp);
 
     } else if (bScore > pScore) {
       winnerName = botName;
-      // 🎯 THUA BOT: KHÔNG MẤT ĐIỂM (0 EXP)
+      // 🛡️ THUA BOT: KHÔNG MẤT ĐIỂM (0 EXP)
     }
 
     saveUserDataAsync();
@@ -231,7 +233,7 @@ io.on('connection', (socket) => {
       roomId: practiceRoomId,
       lesson: lesson || 1,
       players: [
-        { name: username, rank: getRank(usersData[username].exp || 0) },
+        { name: username, rank: getRank(Math.ceil(usersData[username].exp || 0)) },
         { name: botName, rank: `AI ${rankLabel}` }
       ],
       question: rooms[practiceRoomId].questions[0]
@@ -288,7 +290,7 @@ io.on('connection', (socket) => {
         lesson: room.lesson,
         players: room.players.map(p => ({
           name: p.username,
-          rank: getRank(usersData[p.username]?.exp || 0)
+          rank: getRank(Math.ceil(usersData[p.username]?.exp || 0))
         })),
         question: room.questions[room.currentQ]
       });
@@ -323,7 +325,7 @@ io.on('connection', (socket) => {
       room.answered = true;
       if (room.botTimer) clearTimeout(room.botTimer);
 
-      room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) + 10;
+      room.matchScores[socket.username] = Math.ceil((room.matchScores[socket.username] || 0) + 10);
 
       io.to(roomId).emit('roundResult', { 
         winner: socket.username, 
@@ -355,16 +357,16 @@ io.on('connection', (socket) => {
 
             let basePoints = getBasePoints(room.lesson);
 
-            // 🎯 NGƯỜI THẮNG: +BasePoints EXP
+            // 🎯 NGƯỜI THẮNG: +BasePoints EXP (Làm tròn lên)
             if (winnerName && usersData[winnerName]) {
               usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
-              usersData[winnerName].exp = (usersData[winnerName].exp || 0) + basePoints;
+              usersData[winnerName].exp = Math.ceil((usersData[winnerName].exp || 0) + basePoints);
             }
 
-            // 🎯 NGƯỜI THUA: -BasePoints EXP (Trừ không quá 0 điểm)
+            // 🎯 NGƯỜI THUA: -BasePoints EXP (Không dưới 0 điểm)
             if (loserName && usersData[loserName]) {
               let oldExp = usersData[loserName].exp || 0;
-              usersData[loserName].exp = Math.max(0, oldExp - basePoints);
+              usersData[loserName].exp = Math.ceil(Math.max(0, oldExp - basePoints));
             }
 
             saveUserDataAsync();
@@ -378,9 +380,9 @@ io.on('connection', (socket) => {
       }, 1200);
 
     } else {
-      // ❌ TRẢ LỜI SAI: -8 điểm vào trận đấu
+      // ❌ TRẢ LỜI SAI: -8 điểm vào trận đấu (Làm tròn lên)
       let currentScore = room.matchScores[socket.username] || 0;
-      room.matchScores[socket.username] = currentScore - 8;
+      room.matchScores[socket.username] = Math.ceil(currentScore - 8);
 
       io.to(roomId).emit('roundResult', { winner: null, matchScores: room.matchScores });
       socket.emit('wrongAnswer', { index: optionIndex, msg: `Sai rồi! Bị trừ 8 điểm trận đấu.` });
