@@ -60,6 +60,20 @@ function getRank(exp) {
   return "🌱 Tân thủ";
 }
 
+// 🎯 Hàm tính Điểm Cơ Bản theo Lesson (Lesson 1 = 10, Lesson 2 = 15, v.v...)
+function getBasePoints(lesson) {
+  let l = parseInt(lesson) || 1;
+  return 10 + (l - 1) * 5;
+}
+
+// 🤖 Hàm tính Điểm cho Bot/Người khi đấu với Bot dựa theo Cấp độ
+function getBotModePoints(lesson, botLevel) {
+  let base = getBasePoints(lesson);
+  if (botLevel === 'easy') return Math.round(base * 0.5);   // Dễ: 1/2 điểm cơ bản
+  if (botLevel === 'hard') return Math.round(base * 1.5);   // Khó: 1.5 lần điểm cơ bản
+  return base;                                             // Trung bình: 1.0 lần
+}
+
 let roomCounter = 5;
 let rooms = {};
 
@@ -109,23 +123,20 @@ function getLeaderboard() {
     .slice(0, 10);
 }
 
-// 🤖 Cấu hình thời gian phản xạ Bot theo 3 Cấp độ
+// 🤖 Lịch phản xạ của Bot
 function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
 
-  let delay = 2000;
+  let delay = 6000;
   let level = room.botLevel || 'medium';
 
   if (level === 'easy') {
-    // Dễ: 3.5s - 5.5s
-    delay = Math.floor(Math.random() * 6000) + 8000;
+    delay = Math.floor(Math.random() * 6000) + 8000; // 8.0s - 14.0s
   } else if (level === 'hard') {
-    // Khó: 0.6s - 1.2s
-    delay = Math.floor(Math.random() * 1500) + 2500;
+    delay = Math.floor(Math.random() * 1500) + 2500; // 2.5s - 4.0s
   } else {
-    // Trung bình: 1.8s - 3.0s
-    delay = Math.floor(Math.random() * 3000) + 5000;
+    delay = Math.floor(Math.random() * 3000) + 5000; // 5.0s - 8.0s
   }
 
   room.botTimer = setTimeout(() => {
@@ -133,9 +144,12 @@ function scheduleBotAnswer(roomId) {
 
     room.answered = true;
     let botName = `🤖 Bot HSK (${level.toUpperCase()})`;
-    room.matchScores[botName] = (room.matchScores[botName] || 0) + 10;
+    
+    // Cộng điểm cho Bot theo hệ số cấp độ
+    let points = getBotModePoints(room.lesson, level);
+    room.matchScores[botName] = (room.matchScores[botName] || 0) + points;
 
-    io.to(roomId).emit('roundResult', { winner: botName, matchScores: room.matchScores });
+    io.to(roomId).emit('roundResult', { winner: botName, matchScores: room.matchScores, pointsEarned: points });
 
     setTimeout(() => {
       room.currentQ++;
@@ -182,7 +196,7 @@ io.on('connection', (socket) => {
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
 
-  // Luyện tập với Bot có chọn Cấp Độ
+  // Luyện tập với Bot
   socket.on('joinPractice', ({ username, lesson, botLevel }) => {
     if (!username) return;
 
@@ -296,6 +310,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 🎯 Xử lý trả lời câu hỏi & Cộng/Trừ điểm
   socket.on('submitAnswer', (optionIndex) => {
     let roomId = socket.roomId;
     let room = rooms[roomId];
@@ -307,8 +322,32 @@ io.on('connection', (socket) => {
       room.answered = true;
       if (room.botTimer) clearTimeout(room.botTimer);
 
-      room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) + 10;
-      io.to(roomId).emit('roundResult', { winner: socket.username, matchScores: room.matchScores });
+      let pointsEarned = 0;
+
+      if (room.isPractice) {
+        // Đấu với Bot -> Tính điểm theo Hệ số Cấp Độ Bot
+        pointsEarned = getBotModePoints(room.lesson, room.botLevel);
+        room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) + pointsEarned;
+      } else {
+        // Đấu 1v1 -> Người thắng CỘNG điểm cơ bản, Người thua TRỪ điểm cơ bản (Cướp điểm)
+        pointsEarned = getBasePoints(room.lesson);
+
+        // Cộng điểm người thắng
+        room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) + pointsEarned;
+
+        // Trừ điểm người đối diện (không để điểm âm)
+        let otherPlayer = room.players.find(p => p.username !== socket.username);
+        if (otherPlayer) {
+          let oldScore = room.matchScores[otherPlayer.username] || 0;
+          room.matchScores[otherPlayer.username] = Math.max(0, oldScore - pointsEarned);
+        }
+      }
+
+      io.to(roomId).emit('roundResult', { 
+        winner: socket.username, 
+        matchScores: room.matchScores,
+        pointsEarned: pointsEarned
+      });
 
       setTimeout(async () => {
         room.currentQ++;
@@ -346,11 +385,16 @@ io.on('connection', (socket) => {
         }
       }, 1200);
     } else {
+      // Khi chọn SAI
+      let basePoints = room.isPractice 
+        ? getBotModePoints(room.lesson, room.botLevel) 
+        : getBasePoints(room.lesson);
+
       let currentScore = room.matchScores[socket.username] || 0;
-      room.matchScores[socket.username] = Math.max(0, currentScore - 5);
+      room.matchScores[socket.username] = Math.max(0, currentScore - basePoints);
 
       io.to(roomId).emit('roundResult', { winner: null, matchScores: room.matchScores });
-      socket.emit('wrongAnswer', 'Sai rồi! Bị trừ 5 điểm.');
+      socket.emit('wrongAnswer', `Sai rồi! Bị trừ ${basePoints} điểm.`);
     }
   });
 
