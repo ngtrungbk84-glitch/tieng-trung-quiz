@@ -1,56 +1,126 @@
 {
   "1": [
-    { 
+    {
       "type": "text",
-      "q": "Tên của nhân vật rồng xanh trong phim là gì?",
-      "options": ["Tony", "Gogo", "Jenny", "Pod"],
-      "answer": 1
-    },
-    { 
-      "type": "text",
-      "q": "Câu chào 'My name is Gogo' có nghĩa là gì?",
-      "options": ["Tên tôi là Gogo", "Tôi thích Gogo", "Tạm biệt Gogo", "Gogo đang đến"],
+      "q": "What is the blue dragon's name?",
+      "options": ["Gogo", "Tony", "Jenny", "Pod"],
       "answer": 0
     },
-    { 
+    {
       "type": "text",
-      "q": "Khi ai đó hỏi 'What's your name?', bạn trả lời như thế nào?",
-      "options": ["I'm fine, thank you", "My name is...", "Good morning", "Goodbye"],
+      "q": "What is the boy's name?",
+      "options": ["Gogo", "Tony", "Pod", "Jeany"],
       "answer": 1
     },
-    { 
-      "type": "image",
-      "q": "Hình ảnh này tương ứng với từ vựng nào?", 
-      "media": "https://ngoinhatienganh.com/mm/media/ep1/overall.jpg",
-      "options": ["苹果 (Táo)", "香蕉 (Chuối)", "西瓜 (Dưa hấu)", "猫 (Mèo)"], 
-      "answer": 0 
+    {
+      "type": "text",
+      "q": "What is the girl's name?",
+      "options": ["Jenny", "Tony", "Gogo", "May"],
+      "answer": 0
     },
-    { 
-      "type": "audio",
-      "q": "Nghe phát âm và chọn Pinyin đúng:", 
-      "media": "https://ngoinhatienganh.com/mm/media/ep1/anh1/Please dont touch it.mp3",
-      "options": ["nóngmín", "nóngmíng", "nóngmǐn", "nóngmǐng"], 
-      "answer": 0 
+    {
+      "type": "text",
+      "q": "How do you introduce yourself?",
+      "options": ["My name is...", "Good night", "Thank you", "Goodbye"],
+      "answer": 0
+    },
+    {
+      "type": "text",
+      "q": "When someone asks 'What's your name?', you say:",
+      "options": ["I'm 6 years old", "My name is Gogo", "I like apples", "I'm fine"],
+      "answer": 1
+    },
+    {
+      "type": "text",
+      "q": "What does 'Hello!' mean?",
+      "options": ["Tạm biệt", "Xin chào", "Cảm ơn", "Xin lỗi"],
+      "answer": 1
+    },
+    {
+      "type": "text",
+      "q": "What color is Gogo?",
+      "options": ["Red", "Yellow", "Blue", "Green"],
+      "answer": 2
+    },
+    {
+      "type": "text",
+      "q": "How do you say 'Tạm biệt' in English?",
+      "options": ["Hello", "Goodbye", "Please", "Sorry"],
+      "answer": 1
+    },
+    {
+      "type": "text",
+      "q": "Complete the sentence: 'What's _____ name?'",
+      "options": ["you", "your", "my", "he"],
+      "answer": 1
+    },
+    {
+      "type": "text",
+      "q": "Complete the sentence: '_____ name is Tony.'",
+      "options": ["I", "My", "You", "He"],
+      "answer": 1
     }
   ],
   "2": [
-    { 
+    {
       "type": "text",
-      "q": "Tên của nhân vật bạn nữ trong phim là gì?",
-      "options": ["Tony", "Gogo", "Jenny", "Pod"],
+      "q": "What question is used to ask about someone's name?",
+      "options": ["How are you?", "What's your name?", "How old are you?", "Where are you?"],
+      "answer": 1
+    },
+    {
+      "type": "text",
+      "q": "How do you greet someone in the morning?",
+      "options": ["Good night", "Good afternoon", "Good morning", "Good evening"],
       "answer": 2
     },
-    { 
+    {
       "type": "text",
-      "q": "Câu chào 'I like Gogo' có nghĩa là gì?",
-      "options": ["Tên tôi là Gogo", "Tôi thích Gogo", "Tạm biệt Gogo", "Gogo đang đến"],
+      "q": "What is the correct response to 'How are you?'",
+      "options": ["My name is Gogo", "I'm fine, thank you", "Goodbye", "Yes, I am"],
       "answer": 1
     },
-    { 
+    {
       "type": "text",
-      "q": "Khi ai đó hỏi 'What's your name?', bạn trả lời như thế nào?",
-      "options": ["I'm fine, thank you", "My name is...", "Good morning", "Goodbye"],
+      "q": "What creature is Gogo?",
+      "options": ["A dog", "A cat", "A dragon", "A bird"],
+      "answer": 2
+    },
+    {
+      "type": "text",
+      "q": "How do you say 'Rất vui được gặp bạn' in English?",
+      "options": ["Nice to meet you", "See you later", "How are you", "Thank you very much"],
+      "answer": 0
+    },
+    {
+      "type": "text",
+      "q": "Which word is used to say thank you?",
+      "options": ["Please", "Thanks", "Sorry", "Hello"],
       "answer": 1
+    },
+    {
+      "type": "text",
+      "q": "Complete the sentence: 'Nice _____ meet you.'",
+      "options": ["to", "for", "at", "in"],
+      "answer": 0
+    },
+    {
+      "type": "text",
+      "q": "How do you spell the dragon's name?",
+      "options": ["G-O-G-O", "T-O-N-Y", "J-E-N-N-Y", "P-O-D"],
+      "answer": 0
+    },
+    {
+      "type": "text",
+      "q": "When you leave, what do you say?",
+      "options": ["Hello", "Hi", "See you later", "Good morning"],
+      "answer": 2
+    },
+    {
+      "type": "text",
+      "q": "Is Gogo friendly?",
+      "options": ["Yes, he is", "No, he isn't", "He is sad", "I don't know"],
+      "answer": 0
     }
   ]
 }
