@@ -1,0 +1,24 @@
+{
+  "1": [
+    { 
+      "type": "text",
+      "q": "Pinyin của '苹果' (Quả táo) là gì?", 
+      "options": ["Míngtiān", "Píngguǒ", "Shuǐguǒ", "Chéngzi"], 
+      "answer": 1 
+    },
+    { 
+      "type": "image",
+      "q": "Hình ảnh này tương ứng với từ vựng nào?", 
+      "media": "https://ngoinhatienganh.com/mm/media/ep1/overall.jpg",
+      "options": ["苹果 (Táo)", "香蕉 (Chuối)", "西瓜 (Dưa hấu)", "猫 (Mèo)"], 
+      "answer": 0 
+    },
+    { 
+      "type": "audio",
+      "q": "Nghe phát âm và chọn Pinyin đúng:", 
+      "media": "https://ngoinhatienganh.com/mm/media/ep1/anh1/Please dont touch it.mp3",
+      "options": ["nóngmín", "nóngmíng", "nóngmǐn", "nóngmǐng"], 
+      "answer": 0 
+    }
+  ]
+}
