@@ -2,10 +2,25 @@
   "1": [
     { 
       "type": "text",
-      "q": "Pinyin của '苹果' (Quả táo) là gì?", 
-      "options": ["Míngtiān", "Píngguǒ", "Shuǐguǒ", "Chéngzi"], 
-      "answer": 1 
+     "q": "Tên của nhân vật rồng xanh trong phim là gì?",
+      "options": ["Tony", "Gogo", "Jenny", "Pod"],
+      "answer": 1
     },
+    { 
+      "type": "text",
+    
+      "q": "Câu chào 'My name is Gogo' có nghĩa là gì?",
+      "options": ["Tên tôi là Gogo", "Tôi thích Gogo", "Tạm biệt Gogo", "Gogo đang đến"],
+      "answer": 0
+    },
+    { 
+      "type": "text",
+    
+      "q": "Khi ai đó hỏi 'What's your name?', bạn trả lời như thế nào?",
+      "options": ["I'm fine, thank you", "My name is...", "Good morning", "Goodbye"],
+      "answer": 1
+    },
+    
     { 
       "type": "image",
       "q": "Hình ảnh này tương ứng với từ vựng nào?", 
