@@ -1,12 +1,13 @@
 {
-  "name": "game-tieng-trung",
+  "name": "mi-friends-adventure-server",
   "version": "1.0.0",
+  "description": "Multiplayer Game Engine for Mi & Friends Adventure World",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "socket.io": "^4.7.2"
+    "socket.io": "^4.6.1"
   }
 }
