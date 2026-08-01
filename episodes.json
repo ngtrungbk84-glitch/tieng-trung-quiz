@@ -1,0 +1,51 @@
+{
+  "HOME_KITCHEN_005": {
+    "episode_id": "HOME_KITCHEN_005",
+    "title": "🎉 Kitchen Party (Kitchen Boss)",
+    "lesson_name": "Area 1: Kitchen - Ep 5",
+    "base_exp": 50,
+    "actions": [
+      {
+        "action_id": "A001",
+        "type": "FIND_OBJECT",
+        "title": "🎈 Party Cleanup",
+        "instruction": "Tìm đồ đạc thất lạc: 5 Táo, 5 Cookie, 3 Chai sữa, 5 Đĩa!",
+        "target": { "apples": 5, "cookies": 5, "milk": 3, "plates": 5 },
+        "options": ["Thu dọn Táo & Đĩa", "Thu dọn Bánh & Sữa", "Bỏ qua không dọn"],
+        "answer": 0
+      },
+      {
+        "action_id": "A010",
+        "type": "SORT_OBJECT",
+        "title": "🧹 Organize The Kitchen",
+        "instruction": "Sắp xếp đồ đạc vào 3 nhóm: Food, Drinks, Tableware!",
+        "options": ["Phân loại đúng nhóm", "Xếp nhầm Sữa vào Food", "Xếp nhầm Đĩa vào Drink"],
+        "answer": 0
+      },
+      {
+        "action_id": "A004",
+        "type": "COUNT",
+        "title": "🍎 Count Food",
+        "instruction": "Harry hỏi: 'Chúng ta có đủ 5 đĩa đồ ăn chưa?'",
+        "options": ["Đủ 5 đĩa", "Thiếu 1 đĩa", "Thừa 2 đĩa"],
+        "answer": 0
+      },
+      {
+        "action_id": "A008",
+        "type": "DISTRIBUTE",
+        "title": "🍰 Party Distribute",
+        "instruction": "Chia cho Mi, Bon, Mon, Linda, Harry, Tom mỗi người 1 Táo, 1 Cookie, 1 Cốc sữa!",
+        "options": ["Chia đều cho 6 bạn", "Chia thiếu cho Tom", "Cho Mon gấp đôi"],
+        "answer": 0
+      },
+      {
+        "action_id": "A018",
+        "type": "BOSS_SEQUENCE",
+        "title": "🚪 Open The Door",
+        "instruction": "Căn bếp đã sẵn sàng! Nhấn nút mở cửa đón khách!",
+        "options": ["MỞ CỬA BẮT ĐẦU TIỆC! 🎉"],
+        "answer": 0
+      }
+    ]
+  }
+}
