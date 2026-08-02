@@ -119,7 +119,7 @@ function getLeaderboard() {
     .slice(0, 10);
 }
 
-// ⏳ DỪNG ĐẾM NGƯỜI
+// ⏳ DỪNG ĐẾM NGƯỢC
 function stopRoomTimer(roomId) {
   let room = rooms[roomId];
   if (room && room.timerInterval) {
@@ -288,6 +288,21 @@ function finishGameByQuestions(roomId) {
 io.on('connection', (socket) => {
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
+
+  // 💬 XỬ LÝ CHÁT TRONG BÀN CHƠI
+  socket.on('sendChatMessage', (msg) => {
+    let roomId = socket.roomId;
+    if (!roomId || !rooms[roomId] || !msg || !msg.trim()) return;
+
+    let isSpectator = rooms[roomId].spectators.some(s => s.id === socket.id);
+    
+    // Gửi tin nhắn tới toàn bộ mọi người trong phòng (Cả người chơi & khán giả)
+    io.to(roomId).emit('newChatMessage', {
+      sender: socket.username,
+      text: msg.trim(),
+      isSpectator: isSpectator
+    });
+  });
 
   // 🤖 LUYỆN TẬP VỚI BOT
   socket.on('joinPractice', ({ username, lesson, botLevel }) => {
