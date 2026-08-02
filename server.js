@@ -79,17 +79,17 @@ function createRoomObject(roomId, lesson = 1) {
   rooms[roomId] = {
     id: roomId,
     lesson: lesson,
-    players: [],         // Tối đa 2 VĐV chính
-    spectators: [],      // Danh sách khán giả xem trực tiếp
+    players: [],          // Tối đa 2 VĐV chính
+    spectators: [],       // Danh sách khán giả xem trực tiếp
     currentQ: 0,
     matchScores: {},
-    playerTimers: {},    // Lưu thời gian còn lại của từng người chơi (Dùng cho PVP)
-    activeTurnIndex: 0,  // Chỉ số người chơi đang đến lượt (0 hoặc 1)
-    timerInterval: null, // Interval đếm ngược lượt PVP
+    playerTimers: {},     // Lưu thời gian còn lại của từng người chơi (Dùng cho PVP)
+    activeTurnIndex: 0,   // Chỉ số người chơi đang đến lượt (0 hoặc 1)
+    timerInterval: null,  // Interval đếm ngược lượt PVP
     isPractice: false,
     botLevel: 'medium',
     botTimeout: null,
-    isInGame: false,     // Trạng thái đang trong trận đấu
+    isInGame: false,      // Trạng thái đang trong trận đấu
     questions: getQuestionsByLesson(lesson)
   };
 }
@@ -121,7 +121,7 @@ function getLeaderboard() {
     .slice(0, 10);
 }
 
-// ⏳ DỪNG ĐẾM NGƯỢC
+// ⏳ DỪNG ĐẾM NGƯỜI
 function stopRoomTimer(roomId) {
   let room = rooms[roomId];
   if (room && room.timerInterval) {
@@ -258,7 +258,7 @@ function handlePlayerForfeit(socket) {
   }
 }
 
-// 🏆 TỔNG KẾT KHI XỬ THUA DO HẾT GIỜ (KẾT THÚC BÌNH THƯỜNG -> +50 EXP THƯỞNG)
+// 🏆 TỔNG KẾT KHI XỬ THUA DO HẾT GIỜ
 function finishGameDueToTimeout(roomId, winnerName, loserName) {
   let room = rooms[roomId];
   if (!room) return;
@@ -268,12 +268,10 @@ function finishGameDueToTimeout(roomId, winnerName, loserName) {
 
   if (winnerName && usersData[winnerName]) {
     usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
-    // Điểm cơ bản + 50 EXP Thưởng hoàn thành
     usersData[winnerName].exp = Math.ceil((usersData[winnerName].exp || 0) + basePoints + 50);
   }
   if (loserName && usersData[loserName]) {
     let oldExp = usersData[loserName].exp || 0;
-    // Trừ điểm cơ bản + 50 EXP Thưởng hoàn thành
     usersData[loserName].exp = Math.ceil(Math.max(0, oldExp - basePoints) + 50);
   }
 
@@ -309,7 +307,6 @@ function finishGameByQuestions(roomId) {
 
   let basePoints = getBasePoints(room.lesson);
 
-  // 🤖 1. CHẾ ĐỘ CHƠI VỚI BOT: Chỉ cộng điểm cơ bản theo cấp độ, KHÔNG cộng 50 điểm thưởng
   if (room.isPractice) {
     let humanPlayer = room.players.find(p => !p.username.startsWith("🤖 Bot HSK"));
     if (humanPlayer && winnerName === humanPlayer.username && usersData[humanPlayer.username]) {
@@ -319,7 +316,6 @@ function finishGameByQuestions(roomId) {
       usersData[humanPlayer.username].exp = Math.ceil((usersData[humanPlayer.username].exp || 0) + earnedExp);
     }
   } else {
-    // ⚔️ 2. CHẾ ĐỘ PVP (NGƯỜI VS NGƯỜI): Cả 2 đều nhận +50 EXP Thưởng hoàn thành
     if (winnerName && usersData[winnerName]) {
       usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
       usersData[winnerName].exp = Math.ceil((usersData[winnerName].exp || 0) + basePoints + 50);
@@ -355,18 +351,15 @@ io.on('connection', (socket) => {
     let user = usersData[username];
 
     if (user) {
-      // Đã có tài khoản -> Kiểm tra mật khẩu
       if (user.password && user.password !== password) {
         return socket.emit('authResult', { success: false, msg: 'Sai mật khẩu!' });
       } else {
-        // Cập nhật mật khẩu nếu trước đó chưa có mật khẩu
         user.password = password;
         saveUserDataAsync();
         socket.username = username;
         return socket.emit('authResult', { success: true, username: username, exp: user.exp || 0, wins: user.wins || 0 });
       }
     } else {
-      // Tạo tài khoản mới
       usersData[username] = { exp: 0, wins: 0, password: password };
       saveUserDataAsync();
       socket.username = username;
@@ -529,30 +522,15 @@ io.on('connection', (socket) => {
     if (roomId && rooms[roomId]) {
       let room = rooms[roomId];
 
-      // Nếu đang trong trận mà thoát -> tính Forfeit
       if (room.isInGame) {
         handlePlayerForfeit(socket);
-      }
-
-      room.spectators = room.spectators.filter(s => s.id !== socket.id);
-
-      if (room.players.some(p => p.id === socket.id)) {
-        stopRoomTimer(roomId);
-        if (room.botTimeout) clearTimeout(room.botTimeout);
-        socket.leave(roomId);
-        room.players = room.players.filter(p => p.id !== socket.id);
-        socket.roomId = null;
-
-        if (!room.isPractice) {
-          io.to(roomId).emit('playerLeft', `${socket.username} đã rời bàn.`);
-          createRoomObject(roomId, room.lesson);
-          io.emit('roomListUpdate', getPublicRooms());
-        } else {
-          delete rooms[roomId];
-        }
       } else {
+        // Nếu thoát ngoài trận đấu -> Dọn dẹp danh sách
+        room.spectators = room.spectators.filter(s => s.id !== socket.id);
+        room.players = room.players.filter(p => p.id !== socket.id);
         socket.leave(roomId);
         socket.roomId = null;
+        io.emit('roomListUpdate', getPublicRooms());
       }
       socket.emit('leftRoomSuccess');
     }
@@ -653,22 +631,18 @@ io.on('connection', (socket) => {
     if (roomId && rooms[roomId]) {
       let room = rooms[roomId];
 
+      // Nếu đang trong trận đấu mà đứt kết nối -> tính Forfeit
       if (room.isInGame) {
         handlePlayerForfeit(socket);
-      }
-
-      room.spectators = room.spectators.filter(s => s.id !== socket.id);
-
-      if (room.players.some(p => p.id === socket.id)) {
-        stopRoomTimer(roomId);
-        if (room.botTimeout) clearTimeout(room.botTimeout);
-
-        if (!room.isPractice) {
-          io.to(roomId).emit('playerLeft', `${socket.username} đã rời bàn.`);
-          createRoomObject(roomId, room.lesson);
-          io.emit('roomListUpdate', getPublicRooms());
-        } else {
+      } else {
+        // Dọn dẹp an toàn ngoài trận đấu
+        room.spectators = room.spectators.filter(s => s.id !== socket.id);
+        room.players = room.players.filter(p => p.id !== socket.id);
+        
+        if (room.isPractice && room.players.length === 0) {
           delete rooms[roomId];
+        } else {
+          io.emit('roomListUpdate', getPublicRooms());
         }
       }
     }
