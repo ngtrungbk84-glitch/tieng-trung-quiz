@@ -8,11 +8,13 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 
-// Cấu hình CORS để Web Host kết nối thoải mái
 const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
 
 const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbwzhd1IGWLGPs7gUe6tYf4bC5X6xUajAFwEJGH29LU9viXuV2zXvCTfEPaL_1WL8xDZmw/exec";
 const QUESTIONS_FILE = path.join(__dirname, 'questions.json');
+
+// Cấu hình thời gian chơi mặc định (tính bằng giây) cho mỗi người chơi
+const PLAYER_MAX_TIME = 60; 
 
 let usersData = {};
 
@@ -59,7 +61,7 @@ function getRank(exp) {
   return "🌱 Tân thủ";
 }
 
-// 🎯 TÍNH ĐIỂM CƠ BẢN THEO BÀI (Tất cả được làm tròn lên số nguyên)
+// Tính điểm cơ bản theo bài (Làm tròn lên số nguyên)
 function getBasePoints(lesson) {
   let l = parseInt(lesson) || 1;
   return Math.ceil(10 + (l - 1) * 5);
@@ -79,7 +81,9 @@ function createRoomObject(roomId, lesson = 1) {
     players: [],
     currentQ: 0,
     matchScores: {},
-    answered: false,
+    playerTimers: {},    // Lưu thời gian còn lại của từng người chơi
+    activeTurnIndex: 0,  // Chỉ số người chơi đang đến lượt (0 hoặc 1)
+    timerInterval: null, // Interval đếm ngược từng giây
     isPractice: false,
     botLevel: 'medium',
     botTimer: null,
@@ -114,26 +118,88 @@ function getLeaderboard() {
     .slice(0, 10);
 }
 
-// BOT TỰ ĐỘNG BẤM TRẢ LỜI
+// ⏳ DỪNG ĐẾM NGƯỢC
+function stopRoomTimer(roomId) {
+  let room = rooms[roomId];
+  if (room && room.timerInterval) {
+    clearInterval(room.timerInterval);
+    room.timerInterval = null;
+  }
+}
+
+// ⏳ BẮT ĐẦU ĐẾM NGƯỢC CHO NGƯỜI ĐANG ĐẾN LƯỢT
+function startTurnTimer(roomId) {
+  let room = rooms[roomId];
+  if (!room || room.players.length < 2) return;
+
+  stopRoomTimer(roomId);
+
+  let activePlayer = room.players[room.activeTurnIndex];
+  if (!activePlayer) return;
+
+  // Báo cho client biết hiện tại đang là lượt của ai
+  io.to(roomId).emit('turnChanged', {
+    activePlayer: activePlayer.username,
+    playerTimers: room.playerTimers
+  });
+
+  // Nếu là lượt của Bot trong chế độ Luyện tập
+  if (room.isPractice && activePlayer.username.startsWith("🤖 Bot HSK")) {
+    scheduleBotAnswer(roomId);
+    return;
+  }
+
+  // Đếm ngược mỗi 1 giây cho người chơi là người thật
+  room.timerInterval = setInterval(() => {
+    if (!room || !room.playerTimers[activePlayer.username]) return;
+
+    room.playerTimers[activePlayer.username]--;
+
+    // Gửi cập nhật thời gian đếm ngược về cho các client
+    io.to(roomId).emit('timerUpdate', {
+      playerTimers: room.playerTimers
+    });
+
+    // XỬ LÝ HẾT GIỜ -> NGƯỜI ĐANG ĐẾN LƯỢT BỊ THUA NGAY LẬP TỨC
+    if (room.playerTimers[activePlayer.username] <= 0) {
+      stopRoomTimer(roomId);
+      let loserName = activePlayer.username;
+      let winnerPlayer = room.players.find(p => p.username !== loserName);
+      let winnerName = winnerPlayer ? winnerPlayer.username : null;
+
+      finishGameDueToTimeout(roomId, winnerName, loserName);
+    }
+  }, 1000);
+}
+
+// 🤖 BOT TRẢ LỜI
 function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
 
-  let delay = 4000;
+  let delay = 3000;
   let level = room.botLevel || 'medium';
 
-  if (level === 'easy') delay = Math.floor(Math.random() * 4000) + 6000;
-  else if (level === 'hard') delay = Math.floor(Math.random() * 1500) + 1500;
-  else delay = Math.floor(Math.random() * 2500) + 3500;
+  if (level === 'easy') delay = Math.floor(Math.random() * 3000) + 4000;
+  else if (level === 'hard') delay = Math.floor(Math.random() * 1000) + 1500;
+  else delay = Math.floor(Math.random() * 2000) + 2500;
+
+  // Giảm thời gian của bot trong lúc bot suy nghĩ
+  let botName = `🤖 Bot HSK (${level.toUpperCase()})`;
+  let thinkingInterval = setInterval(() => {
+    if (room && room.playerTimers[botName] > 0) {
+      room.playerTimers[botName]--;
+      io.to(roomId).emit('timerUpdate', { playerTimers: room.playerTimers });
+    }
+  }, 1000);
 
   room.botTimer = setTimeout(() => {
-    if (!room || room.answered) return;
+    clearInterval(thinkingInterval);
+    if (!room) return;
 
-    room.answered = true;
-    let botName = `🤖 Bot HSK (${level.toUpperCase()})`;
     let q = room.questions[room.currentQ];
 
-    // Bot bấm đúng: +10 điểm trận đấu (Số nguyên)
+    // Bot trả lời đúng: +10 điểm
     room.matchScores[botName] = Math.ceil((room.matchScores[botName] || 0) + 10);
 
     io.to(roomId).emit('roundResult', { 
@@ -142,63 +208,114 @@ function scheduleBotAnswer(roomId) {
       correctIndex: q ? q.answer : 0
     });
 
+    // Đổi lượt sang cho người chơi
+    room.activeTurnIndex = room.players.findIndex(p => p.username !== botName);
+
     setTimeout(() => {
       room.currentQ++;
       if (room.currentQ < room.questions.length) {
-        room.answered = false;
         io.to(roomId).emit('nextQuestion', room.questions[room.currentQ]);
-        scheduleBotAnswer(roomId);
+        startTurnTimer(roomId);
       } else {
-        finishPracticeGame(roomId);
+        finishGameByQuestions(roomId);
       }
     }, 1200);
   }, delay);
 }
 
-// 🏆 TỔNG KẾT TRẬN ĐẤU VỚI BOT
-function finishPracticeGame(roomId) {
+// 🏆 TỔNG KẾT KHI XỬ THUA DO HẾT GIỜ
+function finishGameDueToTimeout(roomId, winnerName, loserName) {
   let room = rooms[roomId];
   if (!room) return;
 
-  let botName = Object.keys(room.matchScores).find(name => name.startsWith("🤖 Bot HSK"));
-  let humanPlayer = room.players.find(p => p.username !== botName);
-  let winnerName = "Hòa";
+  let basePoints = getBasePoints(room.lesson);
 
-  if (humanPlayer && usersData[humanPlayer.username]) {
-    let pScore = room.matchScores[humanPlayer.username] || 0;
-    let bScore = room.matchScores[botName] || 0;
-    let basePoints = getBasePoints(room.lesson);
-
-    if (pScore > bScore) {
-      winnerName = humanPlayer.username;
-      usersData[humanPlayer.username].wins = (usersData[humanPlayer.username].wins || 0) + 1;
-
-      // 🎯 THẮNG BOT: Tính điểm theo tỷ lệ 20% - 40% - 60% và làm tròn lên
-      let rate = 0.4; // Mặc định vừa (40%)
-      if (room.botLevel === 'easy') rate = 0.2;       // Dễ (20%)
-      else if (room.botLevel === 'hard') rate = 0.6;  // Khó (60%)
-
+  if (room.isPractice) {
+    if (winnerName && !winnerName.startsWith("🤖 Bot HSK") && usersData[winnerName]) {
+      usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
+      let rate = room.botLevel === 'easy' ? 0.2 : room.botLevel === 'hard' ? 0.6 : 0.4;
       let earnedExp = Math.ceil(basePoints * rate);
-
-      usersData[humanPlayer.username].exp = Math.ceil((usersData[humanPlayer.username].exp || 0) + earnedExp);
-
-    } else if (bScore > pScore) {
-      winnerName = botName;
-      // 🛡️ THUA BOT: KHÔNG MẤT ĐIỂM (0 EXP)
+      usersData[winnerName].exp = Math.ceil((usersData[winnerName].exp || 0) + earnedExp);
     }
-
-    saveUserDataAsync();
+  } else {
+    if (winnerName && usersData[winnerName]) {
+      usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
+      usersData[winnerName].exp = Math.ceil((usersData[winnerName].exp || 0) + basePoints);
+    }
+    if (loserName && usersData[loserName]) {
+      let oldExp = usersData[loserName].exp || 0;
+      usersData[loserName].exp = Math.ceil(Math.max(0, oldExp - basePoints));
+    }
   }
 
-  io.to(roomId).emit('gameOver', { winner: winnerName });
+  saveUserDataAsync();
+  io.to(roomId).emit('gameOver', { winner: winnerName, reason: 'timeout' });
   io.emit('leaderboardUpdate', getLeaderboard());
-  delete rooms[roomId];
+
+  if (!room.isPractice) {
+    createRoomObject(roomId, room.lesson);
+    io.emit('roomListUpdate', getPublicRooms());
+  } else {
+    delete rooms[roomId];
+  }
+}
+
+// 🏆 TỔNG KẾT KHI HẾT CÂU HỎI (TÍNH THEO ĐIỂM)
+function finishGameByQuestions(roomId) {
+  let room = rooms[roomId];
+  if (!room) return;
+
+  stopRoomTimer(roomId);
+
+  let p1 = room.players[0].username;
+  let p2 = room.players[1].username;
+  let winnerName = null;
+  let loserName = null;
+
+  if (room.matchScores[p1] > room.matchScores[p2]) {
+    winnerName = p1; loserName = p2;
+  } else if (room.matchScores[p2] > room.matchScores[p1]) {
+    winnerName = p2; loserName = p1;
+  }
+
+  let basePoints = getBasePoints(room.lesson);
+
+  if (room.isPractice) {
+    let humanPlayer = room.players.find(p => !p.username.startsWith("🤖 Bot HSK"));
+    if (humanPlayer && winnerName === humanPlayer.username && usersData[humanPlayer.username]) {
+      usersData[humanPlayer.username].wins = (usersData[humanPlayer.username].wins || 0) + 1;
+      let rate = room.botLevel === 'easy' ? 0.2 : room.botLevel === 'hard' ? 0.6 : 0.4;
+      let earnedExp = Math.ceil(basePoints * rate);
+      usersData[humanPlayer.username].exp = Math.ceil((usersData[humanPlayer.username].exp || 0) + earnedExp);
+    }
+  } else {
+    if (winnerName && usersData[winnerName]) {
+      usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
+      usersData[winnerName].exp = Math.ceil((usersData[winnerName].exp || 0) + basePoints);
+    }
+    if (loserName && usersData[loserName]) {
+      let oldExp = usersData[loserName].exp || 0;
+      usersData[loserName].exp = Math.ceil(Math.max(0, oldExp - basePoints));
+    }
+  }
+
+  saveUserDataAsync();
+  io.to(roomId).emit('gameOver', { winner: winnerName, reason: 'questionsEnded' });
+  io.emit('leaderboardUpdate', getLeaderboard());
+
+  if (!room.isPractice) {
+    createRoomObject(roomId, room.lesson);
+    io.emit('roomListUpdate', getPublicRooms());
+  } else {
+    delete rooms[roomId];
+  }
 }
 
 io.on('connection', (socket) => {
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
 
+  // LƯYỆN TẬP VỚI BOT
   socket.on('joinPractice', ({ username, lesson, botLevel }) => {
     if (!username) return;
 
@@ -220,7 +337,9 @@ io.on('connection', (socket) => {
       players: [socket, { username: botName }],
       currentQ: 0,
       matchScores: { [username]: 0, [botName]: 0 },
-      answered: false,
+      playerTimers: { [username]: PLAYER_MAX_TIME, [botName]: PLAYER_MAX_TIME },
+      activeTurnIndex: 0, // Người chơi đi trước
+      timerInterval: null,
       isPractice: true,
       botLevel: selectedLevel,
       questions: getQuestionsByLesson(lesson || 1)
@@ -239,7 +358,7 @@ io.on('connection', (socket) => {
       question: rooms[practiceRoomId].questions[0]
     });
 
-    scheduleBotAnswer(practiceRoomId);
+    startTurnTimer(practiceRoomId);
   });
 
   socket.on('createNewRoom', (selectedLesson) => {
@@ -279,12 +398,14 @@ io.on('connection', (socket) => {
     socket.join(roomId);
     room.players.push(socket);
     room.matchScores[username] = 0;
+    room.playerTimers[username] = PLAYER_MAX_TIME;
 
     io.emit('roomListUpdate', getPublicRooms());
 
     if (room.players.length === 2) {
       room.currentQ = 0;
-      room.answered = false;
+      room.activeTurnIndex = 0;
+
       io.to(roomId).emit('gameStart', {
         roomId: roomId,
         lesson: room.lesson,
@@ -294,6 +415,8 @@ io.on('connection', (socket) => {
         })),
         question: room.questions[room.currentQ]
       });
+
+      startTurnTimer(roomId);
     } else {
       socket.emit('waitingState', { roomId: roomId, lesson: room.lesson });
     }
@@ -302,6 +425,7 @@ io.on('connection', (socket) => {
   socket.on('leaveRoom', () => {
     let roomId = socket.roomId;
     if (roomId && rooms[roomId]) {
+      stopRoomTimer(roomId);
       if (rooms[roomId].botTimer) clearTimeout(rooms[roomId].botTimer);
       socket.leave(roomId);
       rooms[roomId].players = rooms[roomId].players.filter(p => p.id !== socket.id);
@@ -315,15 +439,20 @@ io.on('connection', (socket) => {
   socket.on('submitAnswer', (optionIndex) => {
     let roomId = socket.roomId;
     let room = rooms[roomId];
-    if (!room || room.answered) return;
+    if (!room) return;
+
+    // Kiểm tra xem có đúng lượt của người bấm hay không
+    let activePlayer = room.players[room.activeTurnIndex];
+    if (!activePlayer || activePlayer.username !== socket.username) {
+      return socket.emit('notice', 'Chưa đến lượt của bạn!');
+    }
 
     let q = room.questions[room.currentQ];
     if (!q) return;
 
     if (optionIndex === q.answer) {
-      // ✅ TRẢ LỜI ĐÚNG: +10 điểm vào trận đấu
-      room.answered = true;
-      if (room.botTimer) clearTimeout(room.botTimer);
+      // ✅ TRẢ LỜI ĐÚNG: +10 điểm, Tắt đếm ngược & Chuyển lượt sang đối thủ
+      stopRoomTimer(roomId);
 
       room.matchScores[socket.username] = Math.ceil((room.matchScores[socket.username] || 0) + 10);
 
@@ -333,66 +462,41 @@ io.on('connection', (socket) => {
         correctIndex: q.answer
       });
 
+      // Chuyển lượt (0 -> 1 hoặc 1 -> 0)
+      room.activeTurnIndex = room.activeTurnIndex === 0 ? 1 : 0;
+
       setTimeout(() => {
         room.currentQ++;
         if (room.currentQ < room.questions.length) {
-          room.answered = false;
           io.to(roomId).emit('nextQuestion', room.questions[room.currentQ]);
-          if (room.isPractice) scheduleBotAnswer(roomId);
+          startTurnTimer(roomId);
         } else {
-          if (room.isPractice) {
-            finishPracticeGame(roomId);
-          } else {
-            // 🏆 TỔNG KẾT TRẬN ĐẤU NGƯỜI VỚI NGƯỜI (1V1)
-            let pNames = room.players.map(p => p.username);
-            let p1 = pNames[0], p2 = pNames[1];
-            let winnerName = null;
-            let loserName = null;
-
-            if (room.matchScores[p1] > room.matchScores[p2]) {
-              winnerName = p1; loserName = p2;
-            } else if (room.matchScores[p2] > room.matchScores[p1]) {
-              winnerName = p2; loserName = p1;
-            }
-
-            let basePoints = getBasePoints(room.lesson);
-
-            // 🎯 NGƯỜI THẮNG: +BasePoints EXP (Làm tròn lên)
-            if (winnerName && usersData[winnerName]) {
-              usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
-              usersData[winnerName].exp = Math.ceil((usersData[winnerName].exp || 0) + basePoints);
-            }
-
-            // 🎯 NGƯỜI THUA: -BasePoints EXP (Không dưới 0 điểm)
-            if (loserName && usersData[loserName]) {
-              let oldExp = usersData[loserName].exp || 0;
-              usersData[loserName].exp = Math.ceil(Math.max(0, oldExp - basePoints));
-            }
-
-            saveUserDataAsync();
-            io.to(roomId).emit('gameOver', { winner: winnerName });
-            io.emit('leaderboardUpdate', getLeaderboard());
-
-            createRoomObject(roomId, room.lesson);
-            io.emit('roomListUpdate', getPublicRooms());
-          }
+          finishGameByQuestions(roomId);
         }
       }, 1200);
 
     } else {
-      // ❌ TRẢ LỜI SAI: -8 điểm vào trận đấu (Làm tròn lên)
+      // ❌ TRẢ LỜI SAI: Không chuyển lượt, bị trừ 1/3 điểm cơ sở
+      let basePoints = getBasePoints(room.lesson);
+      let penalty = Math.ceil(basePoints / 3); // Mức phạt = 1/3 basePoints
+
       let currentScore = room.matchScores[socket.username] || 0;
-      room.matchScores[socket.username] = Math.ceil(currentScore - 8);
+      room.matchScores[socket.username] = Math.ceil(currentScore - penalty);
 
       io.to(roomId).emit('roundResult', { winner: null, matchScores: room.matchScores });
-      socket.emit('wrongAnswer', { index: optionIndex, msg: `Sai rồi! Bị trừ 8 điểm trận đấu.` });
+      socket.emit('wrongAnswer', { 
+        index: optionIndex, 
+        msg: `Sai rồi! Bạn bị trừ ${penalty} điểm trận đấu và phải tiếp tục trả lời.` 
+      });
     }
   });
 
   socket.on('disconnect', () => {
     let roomId = socket.roomId;
     if (roomId && rooms[roomId]) {
+      stopRoomTimer(roomId);
       if (rooms[roomId].botTimer) clearTimeout(rooms[roomId].botTimer);
+
       if (!rooms[roomId].isPractice) {
         io.to(roomId).emit('playerLeft', `${socket.username} đã rời bàn.`);
         createRoomObject(roomId, rooms[roomId].lesson);
