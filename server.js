@@ -119,7 +119,7 @@ function getLeaderboard() {
     .slice(0, 10);
 }
 
-// ⏳ DỪNG ĐẾM NGƯỢC
+// ⏳ DỪNG ĐẾM NGƯỜI
 function stopRoomTimer(roomId) {
   let room = rooms[roomId];
   if (room && room.timerInterval) {
@@ -167,7 +167,7 @@ function startTurnTimer(roomId) {
   }, 1000);
 }
 
-// 🤖 BOT TỰ ĐỘNG BẤM ĐÁP ÁN KHI LUYỆN TẬP (AI NHANH TAY HƠN)
+// 🤖 BOT TỰ ĐỘNG BẤM ĐÁP ÁN KHI LUYỆN TẬP
 function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
@@ -199,7 +199,7 @@ function scheduleBotAnswer(roomId) {
       room.currentQ++;
       if (room.currentQ < room.questions.length) {
         io.to(roomId).emit('nextQuestion', room.questions[room.currentQ]);
-        scheduleBotAnswer(roomId); // Bắt đầu đếm ngược câu tiếp theo cho Bot
+        scheduleBotAnswer(roomId); // Đếm ngược câu tiếp theo cho Bot
       } else {
         finishGameByQuestions(roomId);
       }
@@ -471,6 +471,9 @@ io.on('connection', (socket) => {
     let q = room.questions[room.currentQ];
     if (!q) return;
 
+    let basePoints = getBasePoints(room.lesson);
+    let penalty = Math.ceil(basePoints / 3);
+
     // 🟢 1. CHẾ ĐỘ ĐẤU VỚI BOT (Ai nhanh tay hơn)
     if (room.isPractice) {
       if (optionIndex === q.answer) {
@@ -494,9 +497,14 @@ io.on('connection', (socket) => {
           }
         }, 1200);
       } else {
+        // ❌ TRỪ ĐIỂM KHI CHỌN SAI LÚC CHƠI VỚI BOT
+        let currentScore = room.matchScores[socket.username] || 0;
+        room.matchScores[socket.username] = Math.ceil(currentScore - penalty);
+
+        io.to(roomId).emit('roundResult', { winner: null, matchScores: room.matchScores });
         socket.emit('wrongAnswer', { 
           index: optionIndex, 
-          msg: `Sai rồi! Chọn lại đi bạn ơi.` 
+          msg: `Sai rồi! Bạn bị trừ ${penalty} điểm và phải tiếp tục chọn lại.` 
         });
       }
       return;
@@ -534,10 +542,7 @@ io.on('connection', (socket) => {
       }, 1200);
 
     } else {
-      // ❌ TRẢ LỜI SAI: Không chuyển lượt, bị trừ 1/3 điểm cơ sở
-      let basePoints = getBasePoints(room.lesson);
-      let penalty = Math.ceil(basePoints / 3);
-
+      // ❌ TRẢ LỜI SAI: Bị trừ 1/3 điểm cơ sở
       let currentScore = room.matchScores[socket.username] || 0;
       room.matchScores[socket.username] = Math.ceil(currentScore - penalty);
 
