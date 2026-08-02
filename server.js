@@ -16,6 +16,7 @@ const QUESTIONS_FILE = path.join(__dirname, 'questions.json');
 // Cấu hình thời gian chơi mặc định (tính bằng giây) cho mỗi người chơi trong PvP
 const PLAYER_MAX_TIME = 60; 
 
+// Cấu trúc usersData: { "TenUser": { exp: 100, wins: 5, password: "123" } }
 let usersData = {};
 
 // Tải dữ liệu từ Google Sheet
@@ -315,7 +316,6 @@ function finishGameByQuestions(roomId) {
       usersData[humanPlayer.username].wins = (usersData[humanPlayer.username].wins || 0) + 1;
       let rate = room.botLevel === 'easy' ? 0.2 : room.botLevel === 'hard' ? 0.6 : 0.4;
       let earnedExp = Math.ceil(basePoints * rate);
-      // Chỉ cộng earnedExp (KHÔNG + 50)
       usersData[humanPlayer.username].exp = Math.ceil((usersData[humanPlayer.username].exp || 0) + earnedExp);
     }
   } else {
@@ -346,6 +346,35 @@ io.on('connection', (socket) => {
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
 
+  // 🔐 XỬ LÝ ĐĂNG NHẬP / ĐĂNG KÝ MẬT KHẨU
+  socket.on('authenticate', ({ username, password }) => {
+    if (!username || !password) {
+      return socket.emit('authResult', { success: false, msg: 'Tên và mật khẩu không được trống!' });
+    }
+
+    let user = usersData[username];
+
+    if (user) {
+      // Đã có tài khoản -> Kiểm tra mật khẩu
+      if (user.password && user.password !== password) {
+        return socket.emit('authResult', { success: false, msg: 'Sai mật khẩu!' });
+      } else {
+        // Cập nhật mật khẩu nếu trước đó chưa có mật khẩu
+        user.password = password;
+        saveUserDataAsync();
+        socket.username = username;
+        return socket.emit('authResult', { success: true, username: username, exp: user.exp || 0, wins: user.wins || 0 });
+      }
+    } else {
+      // Tạo tài khoản mới
+      usersData[username] = { exp: 0, wins: 0, password: password };
+      saveUserDataAsync();
+      socket.username = username;
+      io.emit('leaderboardUpdate', getLeaderboard());
+      return socket.emit('authResult', { success: true, username: username, exp: 0, wins: 0 });
+    }
+  });
+
   // 💬 XỬ LÝ CHÁT TRONG BÀN CHƠI
   socket.on('sendChatMessage', (msg) => {
     let roomId = socket.roomId;
@@ -372,11 +401,6 @@ io.on('connection', (socket) => {
     socket.username = username;
     let practiceRoomId = `Luyện Tập - ${socket.id.substring(0, 4)}`;
     socket.roomId = practiceRoomId;
-
-    if (!usersData[username]) {
-      usersData[username] = { exp: 0, wins: 0 };
-      saveUserDataAsync();
-    }
 
     let selectedLevel = botLevel || 'medium';
     let botName = `🤖 Bot HSK (${selectedLevel.toUpperCase()})`;
@@ -406,7 +430,7 @@ io.on('connection', (socket) => {
       lesson: lesson || 1,
       isBot: true,
       players: [
-        { name: username, rank: getRank(Math.ceil(usersData[username].exp || 0)) },
+        { name: username, rank: getRank(Math.ceil(usersData[username]?.exp || 0)) },
         { name: botName, rank: `AI ${rankLabel}` }
       ],
       question: rooms[practiceRoomId].questions[0]
@@ -439,11 +463,6 @@ io.on('connection', (socket) => {
     if (!username) return;
     socket.username = username;
     socket.roomId = roomId;
-
-    if (!usersData[username]) {
-      usersData[username] = { exp: 0, wins: 0 };
-      saveUserDataAsync();
-    }
 
     let room = rooms[roomId];
     if (!room) return socket.emit('notice', 'Bàn không tồn tại!');
