@@ -231,7 +231,7 @@ function handlePlayerForfeit(socket) {
       usersData[loserName].exp = Math.max(0, oldExp - basePoints);
     }
 
-    // 2. Người thắng (ở lại): Cộng ĐIỂM CƠ BẢN (Không có +50 EXP thưởng hoàn thành)
+    // 2. Người thắng (ở lại): Cộng ĐIỂM CƠ BẢN
     if (winnerName && usersData[winnerName]) {
       usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
       usersData[winnerName].exp = Math.ceil((usersData[winnerName].exp || 0) + basePoints);
@@ -284,7 +284,7 @@ function finishGameDueToTimeout(roomId, winnerName, loserName) {
   io.emit('roomListUpdate', getPublicRooms());
 }
 
-// 🏆 TỔNG KẾT KHI HẾT CÂU HỎI (KẾT THÚC BÌNH THƯỜNG -> CẢ 2 +50 EXP THƯỞNG)
+// 🏆 TỔNG KẾT KHI HẾT CÂU HỎI
 function finishGameByQuestions(roomId) {
   let room = rooms[roomId];
   if (!room) return;
@@ -308,16 +308,18 @@ function finishGameByQuestions(roomId) {
 
   let basePoints = getBasePoints(room.lesson);
 
+  // 🤖 1. CHẾ ĐỘ CHƠI VỚI BOT: Chỉ cộng điểm cơ bản theo cấp độ, KHÔNG cộng 50 điểm thưởng
   if (room.isPractice) {
     let humanPlayer = room.players.find(p => !p.username.startsWith("🤖 Bot HSK"));
     if (humanPlayer && winnerName === humanPlayer.username && usersData[humanPlayer.username]) {
       usersData[humanPlayer.username].wins = (usersData[humanPlayer.username].wins || 0) + 1;
       let rate = room.botLevel === 'easy' ? 0.2 : room.botLevel === 'hard' ? 0.6 : 0.4;
       let earnedExp = Math.ceil(basePoints * rate);
-      usersData[humanPlayer.username].exp = Math.ceil((usersData[humanPlayer.username].exp || 0) + earnedExp + 50);
+      // Chỉ cộng earnedExp (KHÔNG + 50)
+      usersData[humanPlayer.username].exp = Math.ceil((usersData[humanPlayer.username].exp || 0) + earnedExp);
     }
   } else {
-    // PVP: Trận đấu kết thúc bình thường -> CẢ 2 ĐỀU +50 EXP THƯỞNG HOÀN THÀNH
+    // ⚔️ 2. CHẾ ĐỘ PVP (NGƯỜI VS NGƯỜI): Cả 2 đều nhận +50 EXP Thưởng hoàn thành
     if (winnerName && usersData[winnerName]) {
       usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
       usersData[winnerName].exp = Math.ceil((usersData[winnerName].exp || 0) + basePoints + 50);
