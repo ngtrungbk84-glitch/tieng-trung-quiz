@@ -19,11 +19,19 @@ async function loadUserDataFromSheet() {
   try {
     const res = await fetch(GOOGLE_SHEET_URL, { redirect: "follow" });
     const text = await res.text();
-    usersData = JSON.parse(text);
-    console.log("✅ Đã tải dữ liệu Google Sheets!");
+    const loadedData = JSON.parse(text);
+    
+    // Đảm bảo dữ liệu tải về luôn có field password
+    for (let uname in loadedData) {
+      usersData[uname] = {
+        password: loadedData[uname].password !== undefined ? String(loadedData[uname].password) : "",
+        exp: Number(loadedData[uname].exp) || 0,
+        wins: Number(loadedData[uname].wins) || 0
+      };
+    }
+    console.log("✅ Đã tải dữ liệu Google Sheets thành công!");
   } catch (e) {
     console.error("❌ Lỗi tải Sheet:", e.message);
-    usersData = {};
   }
 }
 
@@ -319,7 +327,7 @@ io.on('connection', (socket) => {
       return socket.emit('authResult', { success: false, msg: 'Tài khoản không tồn tại! Bấm Đăng Ký nếu bạn là người mới.' });
     }
 
-    if (user.password !== password) {
+    if (String(user.password) !== String(password)) {
       return socket.emit('authResult', { success: false, msg: 'Sai mật khẩu! Vui lòng thử lại.' });
     }
 
@@ -344,7 +352,8 @@ io.on('connection', (socket) => {
       return socket.emit('authResult', { success: false, msg: 'Tên tài khoản này đã có người đăng ký!' });
     }
 
-    usersData[username] = { exp: 0, wins: 0, password: password };
+    // Ghi đúng cấu trúc 4 trường dữ liệu
+    usersData[username] = { password: String(password), exp: 0, wins: 0 };
     saveUserDataAsync();
 
     socket.username = username;
