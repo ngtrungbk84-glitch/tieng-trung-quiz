@@ -223,16 +223,18 @@ function handlePlayerForfeit(socket) {
     let winnerName = winnerPlayer ? winnerPlayer.username : null;
 
     room.isInGame = false;
+    let basePoints = getBasePoints(room.lesson);
 
-    // Phạt người thoát: Trừ 50 EXP (nếu có)
+    // 1. Phạt người thoát: Bị xử thua và trừ ĐIỂM CƠ BẢN
     if (loserName && usersData[loserName]) {
       let oldExp = usersData[loserName].exp || 0;
-      usersData[loserName].exp = Math.max(0, oldExp - 50);
+      usersData[loserName].exp = Math.max(0, oldExp - basePoints);
     }
 
-    // Người ở lại chiến thắng nhưng KHÔNG nhận +50 EXP thưởng hoàn thành
+    // 2. Người thắng (ở lại): Cộng ĐIỂM CƠ BẢN (Không có +50 EXP thưởng hoàn thành)
     if (winnerName && usersData[winnerName]) {
       usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
+      usersData[winnerName].exp = Math.ceil((usersData[winnerName].exp || 0) + basePoints);
     }
 
     saveUserDataAsync();
@@ -255,7 +257,7 @@ function handlePlayerForfeit(socket) {
   }
 }
 
-// 🏆 TỔNG KẾT KHI XỬ THUA DO HẾT GIỜ (BÌNH THƯỜNG -> ĐƯỢC +50 EXP THƯỞNG)
+// 🏆 TỔNG KẾT KHI XỬ THUA DO HẾT GIỜ (KẾT THÚC BÌNH THƯỜNG -> +50 EXP THƯỞNG)
 function finishGameDueToTimeout(roomId, winnerName, loserName) {
   let room = rooms[roomId];
   if (!room) return;
@@ -265,12 +267,12 @@ function finishGameDueToTimeout(roomId, winnerName, loserName) {
 
   if (winnerName && usersData[winnerName]) {
     usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
-    // Cộng điểm bài học + 50 EXP Thưởng hoàn thành
+    // Điểm cơ bản + 50 EXP Thưởng hoàn thành
     usersData[winnerName].exp = Math.ceil((usersData[winnerName].exp || 0) + basePoints + 50);
   }
   if (loserName && usersData[loserName]) {
     let oldExp = usersData[loserName].exp || 0;
-    // Trừ điểm bài học + CỘNG 50 EXP Thưởng hoàn thành
+    // Trừ điểm cơ bản + 50 EXP Thưởng hoàn thành
     usersData[loserName].exp = Math.ceil(Math.max(0, oldExp - basePoints) + 50);
   }
 
@@ -282,7 +284,7 @@ function finishGameDueToTimeout(roomId, winnerName, loserName) {
   io.emit('roomListUpdate', getPublicRooms());
 }
 
-// 🏆 TỔNG KẾT KHI HẾT CÂU HỎI (BÌNH THƯỜNG -> CẢ 2 ĐỀU ĐƯỢC +50 EXP THƯỞNG)
+// 🏆 TỔNG KẾT KHI HẾT CÂU HỎI (KẾT THÚC BÌNH THƯỜNG -> CẢ 2 +50 EXP THƯỞNG)
 function finishGameByQuestions(roomId) {
   let room = rooms[roomId];
   if (!room) return;
