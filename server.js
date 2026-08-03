@@ -9,7 +9,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*", methods: ["GET", "POST"] } });
 
-const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbwzhd1IGWLGPs7gUe6tYf4bC5X6xUajAFwEJGH29LU9viXuV2zXvCTfEPaL_1WL8xDZmw/exec";
+const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbz8SigjCvyT93IbyjyY_hsb5RXXScHVgnRiN_n_4We-P3knig40YvF7Ab1O2GOrk_pgxQ/exec";
 const QUESTIONS_FILE = path.join(__dirname, 'questions.json');
 const PLAYER_MAX_TIME = 60; 
 
@@ -21,7 +21,7 @@ async function loadUserDataFromSheet() {
     const text = await res.text();
     const loadedData = JSON.parse(text);
     
-    // Đảm bảo dữ liệu tải về luôn có field password
+    // Tải dữ liệu và giữ lại password
     for (let uname in loadedData) {
       usersData[uname] = {
         password: loadedData[uname].password !== undefined ? String(loadedData[uname].password) : "",
@@ -29,7 +29,7 @@ async function loadUserDataFromSheet() {
         wins: Number(loadedData[uname].wins) || 0
       };
     }
-    console.log("✅ Đã tải dữ liệu Google Sheets thành công!");
+    console.log("✅ Đã tải dữ liệu Google Sheets thành công!", usersData);
   } catch (e) {
     console.error("❌ Lỗi tải Sheet:", e.message);
   }
@@ -352,7 +352,6 @@ io.on('connection', (socket) => {
       return socket.emit('authResult', { success: false, msg: 'Tên tài khoản này đã có người đăng ký!' });
     }
 
-    // Ghi đúng cấu trúc 4 trường dữ liệu
     usersData[username] = { password: String(password), exp: 0, wins: 0 };
     saveUserDataAsync();
 
