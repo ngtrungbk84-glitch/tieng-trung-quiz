@@ -1,4 +1,4 @@
-// server.js (Chạy trên Render)
+// server.js (Chạy trên Render) - Hoàn chỉnh hỗ trợ Meetmi & Gogo
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -29,7 +29,7 @@ async function loadUserDataFromSheet() {
         wins: Number(loadedData[uname].wins) || 0
       };
     }
-    console.log("✅ Đã tải dữ liệu Google Sheets thành công!", usersData);
+    console.log("✅ Đã tải dữ liệu Google Sheets thành công!");
   } catch (e) {
     console.error("❌ Lỗi tải Sheet:", e.message);
   }
@@ -50,7 +50,7 @@ function getQuestionsByLesson(lesson) {
   if (fs.existsSync(QUESTIONS_FILE)) {
     try {
       const allQ = JSON.parse(fs.readFileSync(QUESTIONS_FILE, 'utf8'));
-      return allQ[lesson] || allQ["1"] || [];
+      return allQ[lesson] || allQ["10"] || allQ["1"] || [];
     } catch (e) { return []; }
   }
   return [];
@@ -65,18 +65,18 @@ function getRank(exp) {
 }
 
 function getBasePoints(lesson) {
-  let l = parseInt(lesson) || 1;
-  return Math.ceil(10 + (l - 1) * 5);
+  let l = parseInt(lesson) || 10;
+  return Math.ceil(10 + (l - 1) * 2);
 }
 
 let roomCounter = 5;
 let rooms = {};
 
 for (let i = 1; i <= 5; i++) {
-  createRoomObject(`Bàn ${i}`, 1);
+  createRoomObject(`Bàn ${i}`, 10);
 }
 
-function createRoomObject(roomId, lesson = 1) {
+function createRoomObject(roomId, lesson = 10) {
   rooms[roomId] = {
     id: roomId,
     lesson: lesson,
@@ -160,6 +160,7 @@ function startTurnTimer(roomId) {
   }, 1000);
 }
 
+// Xử lý tự động trả lời cho Bot
 function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
@@ -171,7 +172,7 @@ function scheduleBotAnswer(roomId) {
               level === 'hard' ? (Math.floor(Math.random() * 1000) + 1500) :
                                  (Math.floor(Math.random() * 2000) + 2500);
 
-  let botName = `🤖 Bot HSK (${level.toUpperCase()})`;
+  let botName = `🤖 Bot Meetmi (${level.toUpperCase()})`;
 
   room.botTimeout = setTimeout(() => {
     if (!rooms[roomId]) return;
@@ -282,7 +283,7 @@ function finishGameByQuestions(roomId) {
   let basePoints = getBasePoints(room.lesson);
 
   if (room.isPractice) {
-    let humanPlayer = room.players.find(p => !p.username.startsWith("🤖 Bot HSK"));
+    let humanPlayer = room.players.find(p => !p.username.startsWith("🤖 Bot"));
     if (humanPlayer && winnerName === humanPlayer.username && usersData[humanPlayer.username]) {
       usersData[humanPlayer.username].wins = (usersData[humanPlayer.username].wins || 0) + 1;
       let rate = room.botLevel === 'easy' ? 0.2 : room.botLevel === 'hard' ? 0.6 : 0.4;
@@ -312,6 +313,7 @@ function finishGameByQuestions(roomId) {
   }
 }
 
+// ------------------- SOCKET ENGINE -------------------
 io.on('connection', (socket) => {
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
@@ -389,11 +391,11 @@ io.on('connection', (socket) => {
     socket.roomId = practiceRoomId;
 
     let selectedLevel = botLevel || 'medium';
-    let botName = `🤖 Bot HSK (${selectedLevel.toUpperCase()})`;
+    let botName = `🤖 Bot Meetmi (${selectedLevel.toUpperCase()})`;
 
     rooms[practiceRoomId] = {
       id: practiceRoomId,
-      lesson: lesson || 1,
+      lesson: lesson || 10,
       players: [socket, { username: botName }],
       spectators: [],
       currentQ: 0,
@@ -405,7 +407,7 @@ io.on('connection', (socket) => {
       botLevel: selectedLevel,
       botTimeout: null,
       isInGame: true,
-      questions: getQuestionsByLesson(lesson || 1)
+      questions: getQuestionsByLesson(lesson || 10)
     };
 
     socket.join(practiceRoomId);
@@ -413,7 +415,7 @@ io.on('connection', (socket) => {
 
     socket.emit('gameStart', {
       roomId: practiceRoomId,
-      lesson: lesson || 1,
+      lesson: lesson || 10,
       isBot: true,
       players: [
         { name: username, rank: getRank(Math.ceil(usersData[username]?.exp || 0)) },
@@ -432,7 +434,7 @@ io.on('connection', (socket) => {
     }
     roomCounter++;
     let newRoomId = `Bàn ${roomCounter}`;
-    createRoomObject(newRoomId, selectedLesson || 1);
+    createRoomObject(newRoomId, selectedLesson || 10);
     io.emit('roomListUpdate', getPublicRooms());
   });
 
@@ -526,7 +528,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('submitAnswer', (optionIndex) => {
+  // 🎯 KIỂM TRA ĐÁP ÁN ĐA DẠNG (TRẮC NGHIỆM & NẠP TỪ/GHÉP CÂU)
+  socket.on('submitAnswer', (data) => {
     let roomId = socket.roomId;
     let room = rooms[roomId];
     if (!room) return;
@@ -539,8 +542,23 @@ io.on('connection', (socket) => {
     let basePoints = getBasePoints(room.lesson);
     let penalty = Math.ceil(basePoints / 3);
 
+    // Kiểm tra câu trả lời
+    let isCorrect = false;
+    let userIndex = typeof data === 'object' ? data.index : data;
+    let userVal = typeof data === 'object' ? data.value : data;
+
+    if (q.type === 'fill' || typeof q.answer === 'string') {
+      if (typeof userVal === 'string' && userVal.trim().toLowerCase() === String(q.answer).trim().toLowerCase()) {
+        isCorrect = true;
+      }
+    } else {
+      if (parseInt(userIndex) === Number(q.answer)) {
+        isCorrect = true;
+      }
+    }
+
     if (room.isPractice) {
-      if (optionIndex === q.answer) {
+      if (isCorrect) {
         if (room.botTimeout) clearTimeout(room.botTimeout);
         room.matchScores[socket.username] = Math.ceil((room.matchScores[socket.username] || 0) + 10);
 
@@ -565,8 +583,8 @@ io.on('connection', (socket) => {
 
         io.to(roomId).emit('roundResult', { winner: null, matchScores: room.matchScores });
         socket.emit('wrongAnswer', { 
-          index: optionIndex, 
-          msg: `Sai rồi! Bạn bị trừ ${penalty} điểm và phải tiếp tục chọn lại.` 
+          index: userIndex, 
+          msg: `Sai rồi! Bạn bị trừ ${penalty} điểm và phải chọn lại.` 
         });
       }
       return;
@@ -577,7 +595,7 @@ io.on('connection', (socket) => {
       return socket.emit('notice', 'Chưa đến lượt của bạn!');
     }
 
-    if (optionIndex === q.answer) {
+    if (isCorrect) {
       stopRoomTimer(roomId);
       room.matchScores[socket.username] = Math.ceil((room.matchScores[socket.username] || 0) + 10);
 
@@ -605,7 +623,7 @@ io.on('connection', (socket) => {
 
       io.to(roomId).emit('roundResult', { winner: null, matchScores: room.matchScores });
       socket.emit('wrongAnswer', { 
-        index: optionIndex, 
+        index: userIndex, 
         msg: `Sai rồi! Bạn bị trừ ${penalty} điểm trận đấu và phải tiếp tục trả lời.` 
       });
     }
