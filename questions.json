@@ -1,126 +1,52 @@
 {
-  "1": [
+  "10": [
     {
-      "type": "text",
-      "q": "What is the blue dragon's name?",
-      "options": ["Gogo", "Tony", "Jenny", "Pod"],
+      "id": 1,
+      "type": "image",
+      "q": "Where does Mimi live?",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/3.jpg",
+      "options": ["In a small village.", "In a big city.", "On a farm."],
+      "answer": 1
+    },
+    {
+      "id": 2,
+      "type": "image",
+      "q": "What does the city look like in the evening?",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/5.jpg",
+      "options": ["Very bright with many lights.", "Very dark and quiet.", "Very cold and snowy."],
       "answer": 0
     },
     {
-      "type": "text",
-      "q": "What is the boy's name?",
-      "options": ["Gogo", "Tony", "Pod", "Jeany"],
+      "id": 3,
+      "type": "image",
+      "q": "Who does Mimi live with?",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/6.jpg",
+      "options": ["With her friends.", "With her family.", "With her teacher."],
       "answer": 1
     },
     {
-      "type": "text",
-      "q": "What is the girl's name?",
-      "options": ["Jenny", "Tony", "Gogo", "May"],
+      "id": 4,
+      "type": "fill",
+      "q": "Arrange the words: 'My name is Mimi. I live in a big city.'",
+      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/1.jpg",
+      "words": ["city.", "big", "a", "in", "live", "I", "Mimi.", "is", "name", "My"],
+      "answer": "My name is Mimi. I live in a big city."
+    },
+    {
+      "id": 5,
+      "type": "image",
+      "q": "Why does Mimi love her city?",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/7.jpg",
+      "options": ["Because it is very exciting.", "Because it is very quiet.", "Because it is very small."],
       "answer": 0
     },
     {
-      "type": "text",
-      "q": "How do you introduce yourself?",
-      "options": ["My name is...", "Good night", "Thank you", "Goodbye"],
-      "answer": 0
-    },
-    {
-      "type": "text",
-      "q": "When someone asks 'What's your name?', you say:",
-      "options": ["I'm 6 years old", "My name is Gogo", "I like apples", "I'm fine"],
-      "answer": 1
-    },
-    {
-      "type": "text",
-      "q": "What does 'Hello!' mean?",
-      "options": ["Tạm biệt", "Xin chào", "Cảm ơn", "Xin lỗi"],
-      "answer": 1
-    },
-    {
-      "type": "text",
-      "q": "What color is Gogo?",
-      "options": ["Red", "Yellow", "Blue", "Green"],
-      "answer": 2
-    },
-    {
-      "type": "text",
-      "q": "How do you say 'Tạm biệt' in English?",
-      "options": ["Hello", "Goodbye", "Please", "Sorry"],
-      "answer": 1
-    },
-    {
-      "type": "text",
-      "q": "Complete the sentence: 'What's _____ name?'",
-      "options": ["you", "your", "my", "he"],
-      "answer": 1
-    },
-    {
-      "type": "text",
-      "q": "Complete the sentence: '_____ name is Tony.'",
-      "options": ["I", "My", "You", "He"],
-      "answer": 1
-    }
-  ],
-  "2": [
-    {
-      "type": "text",
-      "q": "What question is used to ask about someone's name?",
-      "options": ["How are you?", "What's your name?", "How old are you?", "Where are you?"],
-      "answer": 1
-    },
-    {
-      "type": "text",
-      "q": "How do you greet someone in the morning?",
-      "options": ["Good night", "Good afternoon", "Good morning", "Good evening"],
-      "answer": 2
-    },
-    {
-      "type": "text",
-      "q": "What is the correct response to 'How are you?'",
-      "options": ["My name is Gogo", "I'm fine, thank you", "Goodbye", "Yes, I am"],
-      "answer": 1
-    },
-    {
-      "type": "text",
-      "q": "What creature is Gogo?",
-      "options": ["A dog", "A cat", "A dragon", "A bird"],
-      "answer": 2
-    },
-    {
-      "type": "text",
-      "q": "How do you say 'Rất vui được gặp bạn' in English?",
-      "options": ["Nice to meet you", "See you later", "How are you", "Thank you very much"],
-      "answer": 0
-    },
-    {
-      "type": "text",
-      "q": "Which word is used to say thank you?",
-      "options": ["Please", "Thanks", "Sorry", "Hello"],
-      "answer": 1
-    },
-    {
-      "type": "text",
-      "q": "Complete the sentence: 'Nice _____ meet you.'",
-      "options": ["to", "for", "at", "in"],
-      "answer": 0
-    },
-    {
-      "type": "text",
-      "q": "How do you spell the dragon's name?",
-      "options": ["G-O-G-O", "T-O-N-Y", "J-E-N-N-Y", "P-O-D"],
-      "answer": 0
-    },
-    {
-      "type": "text",
-      "q": "When you leave, what do you say?",
-      "options": ["Hello", "Hi", "See you later", "Good morning"],
-      "answer": 2
-    },
-    {
-      "type": "text",
-      "q": "Is Gogo friendly?",
-      "options": ["Yes, he is", "No, he isn't", "He is sad", "I don't know"],
-      "answer": 0
+      "id": 6,
+      "type": "fill",
+      "q": "Arrange the words: 'There are many tall buildings.'",
+      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/4.jpg",
+      "words": ["buildings.", "tall", "many", "are", "There"],
+      "answer": "There are many tall buildings."
     }
   ]
 }
