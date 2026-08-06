@@ -1,66 +1,52 @@
 {
   "10": [
     {
+      "id": 1,
+      "type": "image",
       "q": "Where does Mimi live?",
-      "options": ["In a small village", "In a big city", "In a forest"],
-      "answer": "In a big city"
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/3.jpg",
+      "options": ["In a small village.", "In a big city.", "On a farm."],
+      "answer": 1
     },
     {
-      "q": "What is her city like?",
-      "options": ["Quiet and old", "Busy and beautiful", "Small and dark"],
-      "answer": "Busy and beautiful"
+      "id": 2,
+      "type": "image",
+      "q": "What does the city look like in the evening?",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/5.jpg",
+      "options": ["Very bright with many lights.", "Very dark and quiet.", "Very cold and snowy."],
+      "answer": 0
     },
     {
-      "q": "What are there in the city?",
-      "options": ["Tall buildings and long streets", "Many rivers and mountains", "Only small shops"],
-      "answer": "Tall buildings and long streets"
-    },
-    {
-      "q": "Sắp xếp câu: 'The city is very bright'",
-      "type": "fill",
-      "words": ["bright", "very", "is", "city", "The"],
-      "answer": "The city is very bright"
-    },
-    {
-      "q": "When is the city very bright with many lights?",
-      "options": ["In the morning", "In the afternoon", "In the evening"],
-      "answer": "In the evening"
-    },
-    {
+      "id": 3,
+      "type": "image",
       "q": "Who does Mimi live with?",
-      "options": ["Her friends", "Her family", "Her teacher"],
-      "answer": "Her family"
-    }
-  ],
-  "11": [
-    {
-      "q": "Hoàn thiện câu: 'My name is...'",
-      "options": ["Mimi", "Bon", "Mon"],
-      "answer": "Mimi"
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/6.jpg",
+      "options": ["With her friends.", "With her family.", "With her teacher."],
+      "answer": 1
     },
     {
-      "q": "Sắp xếp câu: 'I live in a big city'",
-      "type": "fill",
-      "words": ["city", "big", "a", "in", "live", "I"],
-      "answer": "I live in a big city"
+      "id": 4,
+      "type": "arrange",
+      "q": "Arrange the words to make a complete sentence:",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/1.jpg",
+      "words": ["city.", "big", "a", "in", "live", "I", "Mimi.", "is", "name", "My"],
+      "answer": "My name is Mimi. I live in a big city."
     },
     {
-      "q": "Sắp xếp câu: 'It is very busy and beautiful'",
-      "type": "fill",
-      "words": ["beautiful", "and", "busy", "very", "is", "It"],
-      "answer": "It is very busy and beautiful"
-    }
-  ],
-  "12": [
-    {
-      "q": "Speaking Q1: What is your name?",
-      "options": ["My name is Mimi", "I live in a city", "I am fine"],
-      "answer": "My name is Mimi"
+      "id": 5,
+      "type": "image",
+      "q": "Why does Mimi love her city?",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/7.jpg",
+      "options": ["Because it is very exciting.", "Because it is very quiet.", "Because it is very small."],
+      "answer": 0
     },
     {
-      "q": "Speaking Q2: Where do you live?",
-      "options": ["In a small village", "I live in a big city", "In the forest"],
-      "answer": "I live in a big city"
+      "id": 6,
+      "type": "arrange",
+      "q": "Arrange the words to make a complete sentence:",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/4.jpg",
+      "words": ["buildings.", "tall", "many", "are", "There"],
+      "answer": "There are many tall buildings."
     }
   ]
 }
