@@ -26,9 +26,9 @@
     },
     {
       "id": 4,
-      "type": "fill",
-      "q": "Arrange the words: 'My name is Mimi. I live in a big city.'",
-      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/1.jpg",
+      "type": "arrange",
+      "q": "Arrange the words to make a complete sentence:",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/1.jpg",
       "words": ["city.", "big", "a", "in", "live", "I", "Mimi.", "is", "name", "My"],
       "answer": "My name is Mimi. I live in a big city."
     },
@@ -42,9 +42,9 @@
     },
     {
       "id": 6,
-      "type": "fill",
-      "q": "Arrange the words: 'There are many tall buildings.'",
-      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/4.jpg",
+      "type": "arrange",
+      "q": "Arrange the words to make a complete sentence:",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/4.jpg",
       "words": ["buildings.", "tall", "many", "are", "There"],
       "answer": "There are many tall buildings."
     }
