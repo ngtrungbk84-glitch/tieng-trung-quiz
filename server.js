@@ -1,4 +1,4 @@
-// server.js (Chạy trên Render) - Đã hỗ trợ Trộn câu hỏi & Bài L10D1 (Audio, Ảnh, Fill, Choice)
+// server.js (Chạy trên Render) - Đã sửa lỗi Arrange the Words & Trộn câu hỏi
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -45,7 +45,7 @@ function saveUserDataAsync() {
 
 loadUserDataFromSheet();
 
-// 🔀 Hàm xáo trộn danh sách câu hỏi ngẫu nhiên (Fisher-Yates Shuffle)
+// 🔀 Hàm xáo trộn danh sách câu hỏi ngẫu nhiên (Fisher-Yates)
 function shuffleArray(array) {
   let arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -61,7 +61,7 @@ function getQuestionsByLesson(lesson) {
     try {
       const allQ = JSON.parse(fs.readFileSync(QUESTIONS_FILE, 'utf8'));
       let rawQuestions = allQ[lesson] || allQ["L10D1"] || allQ["10"] || allQ["1"] || [];
-      return shuffleArray(rawQuestions); // Trộn ngẫu nhiên câu hỏi khi lấy ra
+      return shuffleArray(rawQuestions);
     } catch (e) { return []; }
   }
   return [];
@@ -102,7 +102,7 @@ function createRoomObject(roomId, lesson = "10") {
     botLevel: 'medium',
     botTimeout: null,
     isInGame: false,      
-    questions: getQuestionsByLesson(lesson) // Tự động xáo trộn ngẫu nhiên
+    questions: getQuestionsByLesson(lesson)
   };
 }
 
@@ -171,7 +171,7 @@ function startTurnTimer(roomId) {
   }, 1000);
 }
 
-// 🤖 Xử lý Bot tự động trả lời bài ngẫu nhiên
+// 🤖 Xử lý Bot tự động trả lời
 function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
@@ -416,7 +416,7 @@ io.on('connection', (socket) => {
       botLevel: selectedLevel,
       botTimeout: null,
       isInGame: true,
-      questions: getQuestionsByLesson(lesson || "10") // Lấy câu hỏi trộn ngẫu nhiên
+      questions: getQuestionsByLesson(lesson || "10")
     };
 
     socket.join(practiceRoomId);
@@ -450,7 +450,7 @@ io.on('connection', (socket) => {
   socket.on('changeRoomLesson', ({ roomId, lesson }) => {
     if (rooms[roomId] && rooms[roomId].players.length < 2) {
       rooms[roomId].lesson = lesson;
-      rooms[roomId].questions = getQuestionsByLesson(lesson); // Trộn lại câu hỏi khi đổi bài
+      rooms[roomId].questions = getQuestionsByLesson(lesson);
       io.emit('roomListUpdate', getPublicRooms());
       io.to(roomId).emit('lessonUpdated', lesson);
     }
@@ -537,7 +537,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 🎯 XỬ LÝ ĐÁP ÁN: TRẮC NGHIỆM / ĐIỀN TỪ / AUDIO / HÌNH ẢNH
+  // 🎯 XỬ LÝ NỘP ĐÁP ÁN - ĐÃ FIX TRIỆT ĐỂ BÀI ARRANGE THE WORDS
   socket.on('submitAnswer', (data) => {
     let roomId = socket.roomId;
     let room = rooms[roomId];
@@ -552,15 +552,26 @@ io.on('connection', (socket) => {
     let penalty = Math.ceil(basePoints / 3);
 
     let isCorrect = false;
-    let userIndex = typeof data === 'object' ? data.index : data;
-    let userVal = typeof data === 'object' ? data.value : data;
+    let userIndex = typeof data === 'object' && data !== null ? data.index : data;
+    let userVal = typeof data === 'object' && data !== null ? data.value : data;
 
-    // So sánh đáp án linh hoạt theo định dạng
-    if (q.type === 'fill' || typeof q.answer === 'string') {
-      if (typeof userVal === 'string' && userVal.trim().toLowerCase() === String(q.answer).trim().toLowerCase()) {
+    // 💡 Xử lý kiểm tra đáp án cho ARRANGE / FILL / TRẮC NGHIỆM
+    if (q.type === 'fill' || q.type === 'arrange' || typeof q.answer === 'string') {
+      let parsedUserVal = userVal;
+      
+      // Nếu client gửi mảng các từ: ['My', 'name', 'is'] -> Ghép lại thành chuỗi
+      if (Array.isArray(parsedUserVal)) {
+        parsedUserVal = parsedUserVal.join(' ');
+      }
+
+      let clientAnswerStr = String(parsedUserVal || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      let correctAnswerStr = String(q.answer || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+      if (clientAnswerStr === correctAnswerStr) {
         isCorrect = true;
       }
     } else {
+      // Dạng câu hỏi trắc nghiệm số (0, 1, 2, 3)
       if (parseInt(userIndex) === Number(q.answer)) {
         isCorrect = true;
       }
@@ -593,7 +604,7 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('roundResult', { winner: null, matchScores: room.matchScores });
         socket.emit('wrongAnswer', { 
           index: userIndex, 
-          msg: `Sai rồi! Bạn bị trừ ${penalty} điểm và phải chọn lại.` 
+          msg: `Sai rồi! Bạn bị trừ ${penalty} điểm và phải xếp lại.` 
         });
       }
       return;
@@ -633,7 +644,7 @@ io.on('connection', (socket) => {
       io.to(roomId).emit('roundResult', { winner: null, matchScores: room.matchScores });
       socket.emit('wrongAnswer', { 
         index: userIndex, 
-        msg: `Sai rồi! Bạn bị trừ ${penalty} điểm trận đấu và phải tiếp tục trả lời.` 
+        msg: `Sai rồi! Bạn bị trừ ${penalty} điểm trận đấu và phải tiếp tục thử lại.` 
       });
     }
   });
