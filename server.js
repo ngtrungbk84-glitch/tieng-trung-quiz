@@ -1,4 +1,4 @@
-// server.js (Chạy trên Render) - Hoàn chỉnh hỗ trợ Meetmi & Gogo
+// server.js (Chạy trên Render) - Đã hỗ trợ Trộn câu hỏi & Bài L10D1 (Audio, Ảnh, Fill, Choice)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -21,7 +21,6 @@ async function loadUserDataFromSheet() {
     const text = await res.text();
     const loadedData = JSON.parse(text);
     
-    // Tải dữ liệu và giữ lại password
     for (let uname in loadedData) {
       usersData[uname] = {
         password: loadedData[uname].password !== undefined ? String(loadedData[uname].password) : "",
@@ -46,11 +45,23 @@ function saveUserDataAsync() {
 
 loadUserDataFromSheet();
 
+// 🔀 Hàm xáo trộn danh sách câu hỏi ngẫu nhiên (Fisher-Yates Shuffle)
+function shuffleArray(array) {
+  let arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// 📚 Lấy danh sách câu hỏi theo bài và TỰ ĐỘNG TRỘN NGẪU NHIÊN
 function getQuestionsByLesson(lesson) {
   if (fs.existsSync(QUESTIONS_FILE)) {
     try {
       const allQ = JSON.parse(fs.readFileSync(QUESTIONS_FILE, 'utf8'));
-      return allQ[lesson] || allQ["10"] || allQ["1"] || [];
+      let rawQuestions = allQ[lesson] || allQ["L10D1"] || allQ["10"] || allQ["1"] || [];
+      return shuffleArray(rawQuestions); // Trộn ngẫu nhiên câu hỏi khi lấy ra
     } catch (e) { return []; }
   }
   return [];
@@ -73,10 +84,10 @@ let roomCounter = 5;
 let rooms = {};
 
 for (let i = 1; i <= 5; i++) {
-  createRoomObject(`Bàn ${i}`, 10);
+  createRoomObject(`Bàn ${i}`, "10");
 }
 
-function createRoomObject(roomId, lesson = 10) {
+function createRoomObject(roomId, lesson = "10") {
   rooms[roomId] = {
     id: roomId,
     lesson: lesson,
@@ -91,7 +102,7 @@ function createRoomObject(roomId, lesson = 10) {
     botLevel: 'medium',
     botTimeout: null,
     isInGame: false,      
-    questions: getQuestionsByLesson(lesson)
+    questions: getQuestionsByLesson(lesson) // Tự động xáo trộn ngẫu nhiên
   };
 }
 
@@ -160,7 +171,7 @@ function startTurnTimer(roomId) {
   }, 1000);
 }
 
-// Xử lý tự động trả lời cho Bot
+// 🤖 Xử lý Bot tự động trả lời bài ngẫu nhiên
 function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
@@ -318,7 +329,6 @@ io.on('connection', (socket) => {
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
 
-  // 🔑 XỬ LÝ ĐĂNG NHẬP
   socket.on('login', ({ username, password }) => {
     if (!username || !password) {
       return socket.emit('authResult', { success: false, msg: 'Tên và Mật khẩu không được để trống!' });
@@ -344,7 +354,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 📝 XỬ LÝ ĐĂNG KÝ
   socket.on('register', ({ username, password }) => {
     if (!username || !password) {
       return socket.emit('authResult', { success: false, msg: 'Tên và Mật khẩu không được để trống!' });
@@ -395,7 +404,7 @@ io.on('connection', (socket) => {
 
     rooms[practiceRoomId] = {
       id: practiceRoomId,
-      lesson: lesson || 10,
+      lesson: lesson || "10",
       players: [socket, { username: botName }],
       spectators: [],
       currentQ: 0,
@@ -407,7 +416,7 @@ io.on('connection', (socket) => {
       botLevel: selectedLevel,
       botTimeout: null,
       isInGame: true,
-      questions: getQuestionsByLesson(lesson || 10)
+      questions: getQuestionsByLesson(lesson || "10") // Lấy câu hỏi trộn ngẫu nhiên
     };
 
     socket.join(practiceRoomId);
@@ -415,7 +424,7 @@ io.on('connection', (socket) => {
 
     socket.emit('gameStart', {
       roomId: practiceRoomId,
-      lesson: lesson || 10,
+      lesson: lesson || "10",
       isBot: true,
       players: [
         { name: username, rank: getRank(Math.ceil(usersData[username]?.exp || 0)) },
@@ -434,14 +443,14 @@ io.on('connection', (socket) => {
     }
     roomCounter++;
     let newRoomId = `Bàn ${roomCounter}`;
-    createRoomObject(newRoomId, selectedLesson || 10);
+    createRoomObject(newRoomId, selectedLesson || "10");
     io.emit('roomListUpdate', getPublicRooms());
   });
 
   socket.on('changeRoomLesson', ({ roomId, lesson }) => {
     if (rooms[roomId] && rooms[roomId].players.length < 2) {
       rooms[roomId].lesson = lesson;
-      rooms[roomId].questions = getQuestionsByLesson(lesson);
+      rooms[roomId].questions = getQuestionsByLesson(lesson); // Trộn lại câu hỏi khi đổi bài
       io.emit('roomListUpdate', getPublicRooms());
       io.to(roomId).emit('lessonUpdated', lesson);
     }
@@ -528,7 +537,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 🎯 KIỂM TRA ĐÁP ÁN ĐA DẠNG (TRẮC NGHIỆM & NẠP TỪ/GHÉP CÂU)
+  // 🎯 XỬ LÝ ĐÁP ÁN: TRẮC NGHIỆM / ĐIỀN TỪ / AUDIO / HÌNH ẢNH
   socket.on('submitAnswer', (data) => {
     let roomId = socket.roomId;
     let room = rooms[roomId];
@@ -542,11 +551,11 @@ io.on('connection', (socket) => {
     let basePoints = getBasePoints(room.lesson);
     let penalty = Math.ceil(basePoints / 3);
 
-    // Kiểm tra câu trả lời
     let isCorrect = false;
     let userIndex = typeof data === 'object' ? data.index : data;
     let userVal = typeof data === 'object' ? data.value : data;
 
+    // So sánh đáp án linh hoạt theo định dạng
     if (q.type === 'fill' || typeof q.answer === 'string') {
       if (typeof userVal === 'string' && userVal.trim().toLowerCase() === String(q.answer).trim().toLowerCase()) {
         isCorrect = true;
