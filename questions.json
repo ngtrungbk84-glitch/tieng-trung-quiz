@@ -3,7 +3,7 @@
     {
       "id": 1,
       "type": "audio",
-      "q": "Nghe audio và chọn đáp án đúng:",
+      "q": "Where does Mimi live?",
       "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/meetmi10.mp3",
       "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/3.jpg",
       "options": ["In a small village.", "In a big city.", "On a farm."],
@@ -20,7 +20,7 @@
     {
       "id": 3,
       "type": "audio",
-      "q": "Nghe đoạn hội thoại và cho biết Mimi sống với ai:",
+      "q": "Who does Mimi live with?",
       "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/meetmi10.mp3",
       "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/6.jpg",
       "options": ["With her friends.", "With her family.", "With her teacher."],
@@ -31,7 +31,7 @@
       "type": "arrange",
       "q": "Sắp xếp các từ thành câu hoàn chỉnh:",
       "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/1.jpg",
-      "words": ["city.", "big", "a", "in", "live", "I", "Mimi.", "is", "name", "My"],
+      "words": ["big", "city.",  "is", "name","a", "in", "live", "I", "My", "Mimi."],
       "answer": "My name is Mimi. I live in a big city."
     },
     {
@@ -47,7 +47,7 @@
       "type": "arrange",
       "q": "Sắp xếp các từ thành câu hoàn chỉnh:",
       "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/4.jpg",
-      "words": ["buildings.", "tall", "many", "are", "There"],
+      "words": ["tall", "many", "buildings.",  "are", "There"],
       "answer": "There are many tall buildings."
     }
   ]
