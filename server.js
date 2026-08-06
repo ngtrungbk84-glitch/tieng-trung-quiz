@@ -3,9 +3,15 @@ const http = require('http');
 const { Server } = require("socket.io");
 const cors = require('cors');
 const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(cors());
+
+// Trả về file index.html khi truy cập web
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -14,14 +20,18 @@ const io = new Server(server, {
 
 let questionsData = {};
 try {
-  questionsData = JSON.parse(fs.readFileSync('./questions.json', 'utf8'));
+  if (fs.existsSync('./questions.json')) {
+    questionsData = JSON.parse(fs.readFileSync('./questions.json', 'utf8'));
+  }
 } catch (e) {
-  console.log("⚠️ File questions.json chưa đúng hoặc chưa có. Đang dùng dữ liệu trống.");
+  console.log("⚠️ File questions.json lỗi hoặc không có. Dùng dữ liệu rỗng.");
 }
 
 let users = {};
 try {
-  users = JSON.parse(fs.readFileSync('./users.json', 'utf8'));
+  if (fs.existsSync('./users.json')) {
+    users = JSON.parse(fs.readFileSync('./users.json', 'utf8'));
+  }
 } catch (e) {
   users = {};
 }
@@ -30,13 +40,13 @@ function saveUsers() {
   try {
     fs.writeFileSync('./users.json', JSON.stringify(users, null, 2));
   } catch (e) {
-    console.error("Lỗi lưu users:", e);
+    console.error("⚠️ Không thể ghi file users.json (Chế độ Read-only):", e.message);
   }
 }
 
 let rooms = {};
 
-// Khởi tạo 12 bàn chơi cố định
+// Khởi tạo 12 bàn chơi
 function initRooms() {
   for (let i = 1; i <= 12; i++) {
     const roomId = `Bàn ${i}`;
@@ -56,44 +66,55 @@ function initRooms() {
 initRooms();
 
 io.on('connection', (socket) => {
-  // Đăng nhập
+  // Tự động gửi danh sách bàn và BXH ngay khi client vừa kết nối
+  socket.emit('roomListUpdate', getRoomListData());
+  socket.emit('leaderboardUpdate', getLeaderboardData());
+
+  // ĐĂNG NHẬP
   socket.on('login', ({ username, password }) => {
-    if (!username || !password) return;
-    if (users[username] && users[username].password === password) {
+    if (!username || !password) {
+      return socket.emit('authResult', { success: false, msg: "Vui lòng nhập đầy đủ thông tin!" });
+    }
+    const user = users[username];
+    if (user && user.password === password) {
       socket.username = username;
-      socket.emit('authResult', { success: true, username, ...users[username] });
-      emitRoomList();
-      emitLeaderboard();
+      socket.emit('authResult', { 
+        success: true, 
+        username: username, 
+        rank: user.rank || '🌱 Tân thủ', 
+        exp: user.exp || 0 
+      });
     } else {
       socket.emit('authResult', { success: false, msg: "Tài khoản hoặc mật khẩu không đúng!" });
     }
   });
 
-  // Đăng ký
+  // ĐĂNG KÝ
   socket.on('register', ({ username, password }) => {
-    if (!username || !password) return;
+    if (!username || !password) {
+      return socket.emit('authResult', { success: false, msg: "Vui lòng nhập tên và mật khẩu!" });
+    }
     if (users[username]) {
-      return socket.emit('authResult', { success: false, msg: "Tài khoản đã tồn tại!" });
+      return socket.emit('authResult', { success: false, msg: "Tài khoản này đã tồn tại!" });
     }
+
+    // Tạo user mới
     users[username] = { password, rank: '🌱 Tân thủ', exp: 0, wins: 0 };
-    saveUsers();
+    saveUsers(); // Lưu file
+
     socket.username = username;
-    socket.emit('authResult', { success: true, username, ...users[username] });
-    emitRoomList();
-    emitLeaderboard();
+    socket.emit('authResult', { 
+      success: true, 
+      username: username, 
+      rank: users[username].rank, 
+      exp: users[username].exp 
+    });
+
+    // Cập nhật BXH toàn bộ máy chủ
+    io.emit('leaderboardUpdate', getLeaderboardData());
   });
 
-  // Đổi bài học trong phòng chờ
-  socket.on('changeRoomLesson', ({ roomId, lesson }) => {
-    const room = rooms[roomId];
-    if (room && !room.isStarted) {
-      room.lesson = parseInt(lesson) || 10;
-      io.to(roomId).emit('lessonUpdated', room.lesson);
-      emitRoomList();
-    }
-  });
-
-  // Vào phòng
+  // Vào phòng chơi
   socket.on('joinRoom', ({ username, roomId }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -114,7 +135,6 @@ io.on('connection', (socket) => {
         startGame(room);
       }
     } else {
-      // Khán giả vào xem
       if (!room.spectators.includes(username)) room.spectators.push(username);
       const qList = questionsData[room.lesson] || [];
       socket.emit('gameStart', {
@@ -127,7 +147,7 @@ io.on('connection', (socket) => {
     emitRoomList();
   });
 
-  // Xử lý nộp câu trả lời
+  // Nộp câu trả lời
   socket.on('submitAnswer', (answer) => {
     try {
       const room = rooms[socket.roomId];
@@ -177,7 +197,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Skip câu
+  // Bỏ qua câu hỏi
   socket.on('skipQuestion', () => {
     const room = rooms[socket.roomId];
     if (!room || !room.isStarted) return;
@@ -187,11 +207,7 @@ io.on('connection', (socket) => {
 
     room.scores[socket.username] = Math.max(0, (room.scores[socket.username] || 0) - 20);
 
-    io.to(room.id).emit('roundResult', {
-      winner: null,
-      matchScores: room.scores
-    });
-
+    io.to(room.id).emit('roundResult', { winner: null, matchScores: room.scores });
     io.to(room.id).emit('newChatMessage', {
       sender: '📢 Hệ thống',
       text: `⚠️ ${socket.username} đã BỎ QUA câu hỏi này (-20đ)!`,
@@ -297,23 +313,25 @@ function leaveRoomHandler(socket) {
   emitRoomList();
 }
 
-function emitRoomList() {
-  const list = Object.values(rooms).map(r => ({
+function getRoomListData() {
+  return Object.values(rooms).map(r => ({
     id: r.id,
     lesson: r.lesson,
     playerCount: r.players.length,
     players: r.players.map(p => p.name)
   }));
-  io.emit('roomListUpdate', list);
 }
 
-function emitLeaderboard() {
-  const board = Object.keys(users).map(u => ({
+function emitRoomList() {
+  io.emit('roomListUpdate', getRoomListData());
+}
+
+function getLeaderboardData() {
+  return Object.keys(users).map(u => ({
     username: u,
     rank: users[u].rank || '🌱 Tân thủ',
     exp: users[u].exp || 0
   })).sort((a,b) => b.exp - a.exp);
-  io.emit('leaderboardUpdate', board);
 }
 
 const PORT = process.env.PORT || 3000;
