@@ -11,110 +11,71 @@
     },
     {
       "id": 2,
-      "type": "image",
-      "q": "Nhìn hình ảnh và chọn đáp án phù hợp nhất:",
-      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l1/2.jpg",
-      "options": ["Nice to meet you.", "Goodbye, see you later.", "Good morning teacher."],
-      "answer": 0
+      "type": "true_false",
+      "q": "Đọc câu sau và chọn Đúng hay Sai: 'Mimi lives in a small village.'",
+      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l1/2.jpg",
+      "answer": false
     },
     {
       "id": 3,
+      "type": "fill_in",
+      "q": "Điền từ còn thiếu vào chỗ trống: 'Nice to ______ you.'",
+      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l1/2.jpg",
+      "answer": "meet"
+    },
+    {
+      "id": 4,
+      "type": "matching",
+      "q": "Ghép các từ tiếng Anh với nghĩa tiếng Việt tương ứng:",
+      "pairs": [
+        {"left": "Hello", "right": "Xin chào"},
+        {"left": "City", "right": "Thành phố"},
+        {"left": "Big", "right": "To / Lớn"}
+      ]
+    },
+    {
+      "id": 5,
       "type": "arrange",
       "q": "Sắp xếp các từ thành câu chào hoàn chỉnh:",
       "img": "https://ngoinhatienganh.com/writeyourbook/anh/l1/2.jpg",
       "words": ["Nice", "to", "meet", "you."],
       "answer": "Nice to meet you."
-    },
-    {
-      "id": 4,
-      "type": "choice",
-      "q": "Khi gặp ai đó lần đầu tiên, bạn sẽ nói gì?",
-      "options": ["Good night!", "Nice to meet you!", "Thank you very much!"],
-      "answer": 1
     }
   ],
   "10": [
     {
       "id": 1,
-      "type": "audio",
-      "q": "Nghe đoạn băng và trả lời: Where does Mimi live?",
-      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/meetmi10.mp3",
-      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/3.jpg",
-      "options": ["In a small village.", "In a big city.", "On a peaceful farm."],
-      "answer": 1
+      "type": "spot_error",
+      "q": "Tìm từ bị dùng sai trong câu sau: 'Mimi live in a big city.'",
+      "options": ["Mimi", "live", "in", "city"],
+      "answer": "live",
+      "explanation": "Vì 'Mimi' là ngôi thứ 3 số ít nên động từ 'live' phải thêm 's' thành 'lives'."
     },
     {
       "id": 2,
-      "type": "image",
-      "q": "Nhìn ảnh và cho biết: What does the city look like in the evening?",
-      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/5.jpg",
-      "options": ["Very bright with many lights.", "Very dark and quiet.", "Very cold and snowy."],
-      "answer": 0
+      "type": "drag_drop",
+      "q": "Phân loại các từ sau vào đúng nhóm Tính từ (Adjective) hoặc Danh từ (Noun):",
+      "categories": ["Adjective", "Noun"],
+      "items": [
+        {"word": "Big", "category": "Adjective"},
+        {"word": "City", "category": "Noun"},
+        {"word": "Beautiful", "category": "Adjective"},
+        {"word": "House", "category": "Noun"}
+      ]
     },
     {
       "id": 3,
-      "type": "arrange",
-      "q": "Sắp xếp các từ để hoàn thiện câu mô tả nơi ở của Mimi:",
-      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/1.jpg",
-      "words": ["My", "name", "is", "Mimi.", "I", "live", "in", "a", "big", "city."],
-      "answer": "My name is Mimi. I live in a big city."
+      "type": "speaking",
+      "q": "Bấm mic và đọc to câu sau bằng tiếng Anh:",
+      "phrase": "I live in a big city.",
+      "audio_sample": "https://ngoinhatienganh.com/writeyourbook/anh/l10/meetmi10.mp3"
     },
     {
       "id": 4,
-      "type": "audio",
-      "q": "Nghe và trả lời: Who does Mimi live with?",
-      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/meetmi10.mp3",
-      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/6.jpg",
-      "options": ["With her friends.", "With her family.", "With her teacher."],
-      "answer": 1
-    },
-    {
-      "id": 5,
-      "type": "arrange",
-      "q": "Sắp xếp các từ nói về các tòa nhà trong thành phố:",
+      "type": "fill_in",
+      "q": "Hoàn thiện câu: 'There are many tall ______ in my city.'",
       "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/4.jpg",
-      "words": ["There", "are", "many", "tall", "buildings."],
-      "answer": "There are many tall buildings."
-    },
-    {
-      "id": 6,
-      "type": "choice",
-      "q": "Từ nào sau đây trái nghĩa với từ 'Big'?",
-      "options": ["Large", "Small", "Tall"],
-      "answer": 1
-    },
-    {
-      "id": 7,
-      "type": "image",
-      "q": "Quan sát bức ảnh và trả lời: Why does Mimi love her city?",
-      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/7.jpg",
-      "options": ["Because it is very exciting.", "Because it is very quiet.", "Because it is very small."],
-      "answer": 0
-    }
-  ],
-  "11": [
-    {
-      "id": 1,
-      "type": "image",
-      "q": "Dựa vào hình ảnh, thời tiết hôm nay như thế nào?",
-      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l11/1.jpg",
-      "options": ["It is sunny.", "It is rainy.", "It is windy."],
-      "answer": 0
-    },
-    {
-      "id": 2,
-      "type": "arrange",
-      "q": "Sắp xếp các từ thành câu hỏi thời tiết chuẩn:",
-      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l11/2.jpg",
-      "words": ["What", "is", "the", "weather", "like", "today?"],
-      "answer": "What is the weather like today?"
-    },
-    {
-      "id": 3,
-      "type": "choice",
-      "q": "Mùa nào trong năm thường có nhiều tuyết rơi?",
-      "options": ["Summer", "Autumn", "Winter"],
-      "answer": 2
+      "answer": "buildings"
     }
   ]
 }
