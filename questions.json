@@ -50,7 +50,7 @@
       "type": "arrange",
       "q": "Sắp xếp các từ thành câu hoàn chỉnh:",
       "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/1.jpg",
-      "words": ["big", "city.", "is", "name", "a", "in", "live", "I", "My", "Mimi."],
+      "words": ["My", "name", "is", "Mimi.", "I", "live", "in", "a", "big", "city."],
       "answer": "My name is Mimi. I live in a big city."
     },
     {
@@ -66,7 +66,7 @@
       "type": "arrange",
       "q": "Sắp xếp các từ thành câu hoàn chỉnh:",
       "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/4.jpg",
-      "words": ["tall", "many", "buildings.", "are", "There"],
+      "words": ["There", "are", "many", "tall", "buildings."],
       "answer": "There are many tall buildings."
     }
   ],
@@ -84,7 +84,7 @@
       "type": "arrange",
       "q": "Sắp xếp các từ thành câu hoàn chỉnh:",
       "img": "https://ngoinhatienganh.com/writeyourbook/anh/l11/2.jpg",
-      "words": ["weather", "like", "What", "is", "the", "today?"],
+      "words": ["What", "is", "the", "weather", "like", "today?"],
       "answer": "What is the weather like today?"
     }
   ]
