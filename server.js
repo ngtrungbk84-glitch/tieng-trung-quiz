@@ -1,4 +1,4 @@
-// server.js (Chạy trên Render) - Đã sửa lỗi Arrange the Words & Trộn câu hỏi
+// server.js (Chạy trên Render) - Đã cập nhật tính năng SKIP CÂU HỎI (-20 điểm)
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -45,7 +45,6 @@ function saveUserDataAsync() {
 
 loadUserDataFromSheet();
 
-// 🔀 Hàm xáo trộn danh sách câu hỏi ngẫu nhiên (Fisher-Yates)
 function shuffleArray(array) {
   let arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -55,7 +54,6 @@ function shuffleArray(array) {
   return arr;
 }
 
-// 📚 Lấy danh sách câu hỏi theo bài và TỰ ĐỘNG TRỘN NGẪU NHIÊN
 function getQuestionsByLesson(lesson) {
   if (fs.existsSync(QUESTIONS_FILE)) {
     try {
@@ -171,7 +169,6 @@ function startTurnTimer(roomId) {
   }, 1000);
 }
 
-// 🤖 Xử lý Bot tự động trả lời
 function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
@@ -393,6 +390,55 @@ io.on('connection', (socket) => {
 
   socket.on('playerForfeit', () => handlePlayerForfeit(socket));
 
+  /* ⏩ XỬ LÝ SỰ KIỆN BỎ QUA CÂU HỎI (SKIP) */
+  socket.on('skipQuestion', () => {
+    let roomId = socket.roomId;
+    let room = rooms[roomId];
+    if (!room) return;
+
+    if (room.spectators.some(s => s.id === socket.id)) return;
+
+    if (!room.isPractice) {
+      let activePlayer = room.players[room.activeTurnIndex];
+      if (!activePlayer || activePlayer.username !== socket.username) {
+        return socket.emit('notice', 'Chưa đến lượt của bạn!');
+      }
+      stopRoomTimer(roomId);
+    } else {
+      if (room.botTimeout) clearTimeout(room.botTimeout);
+    }
+
+    let q = room.questions[room.currentQ];
+
+    // Trừ 20 điểm khi skip
+    room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) - 20;
+
+    io.to(roomId).emit('roundResult', { 
+      isSkip: true,
+      player: socket.username,
+      matchScores: room.matchScores,
+      correctIndex: q ? q.answer : undefined
+    });
+
+    if (!room.isPractice) {
+      room.activeTurnIndex = room.activeTurnIndex === 0 ? 1 : 0;
+    }
+
+    setTimeout(() => {
+      room.currentQ++;
+      if (room.currentQ < room.questions.length) {
+        io.to(roomId).emit('nextQuestion', room.questions[room.currentQ]);
+        if (room.isPractice) {
+          scheduleBotAnswer(roomId);
+        } else {
+          startTurnTimer(roomId);
+        }
+      } else {
+        finishGameByQuestions(roomId);
+      }
+    }, 1200);
+  });
+
   socket.on('joinPractice', ({ username, lesson, botLevel }) => {
     if (!username) return;
     socket.username = username;
@@ -537,7 +583,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 🎯 XỬ LÝ NỘP ĐÁP ÁN - ĐÃ FIX TRIỆT ĐỂ BÀI ARRANGE THE WORDS
   socket.on('submitAnswer', (data) => {
     let roomId = socket.roomId;
     let room = rooms[roomId];
@@ -555,11 +600,9 @@ io.on('connection', (socket) => {
     let userIndex = typeof data === 'object' && data !== null ? data.index : data;
     let userVal = typeof data === 'object' && data !== null ? data.value : data;
 
-    // 💡 Xử lý kiểm tra đáp án cho ARRANGE / FILL / TRẮC NGHIỆM
     if (q.type === 'fill' || q.type === 'arrange' || typeof q.answer === 'string') {
       let parsedUserVal = userVal;
       
-      // Nếu client gửi mảng các từ: ['My', 'name', 'is'] -> Ghép lại thành chuỗi
       if (Array.isArray(parsedUserVal)) {
         parsedUserVal = parsedUserVal.join(' ');
       }
@@ -571,7 +614,6 @@ io.on('connection', (socket) => {
         isCorrect = true;
       }
     } else {
-      // Dạng câu hỏi trắc nghiệm số (0, 1, 2, 3)
       if (parseInt(userIndex) === Number(q.answer)) {
         isCorrect = true;
       }
