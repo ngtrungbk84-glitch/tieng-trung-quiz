@@ -1,4 +1,4 @@
-// server.js (Chạy trên Render) - Đã cập nhật tính năng SKIP CÂU HỎI (-20 điểm)
+// server.js (Chạy trên Render) - Đã cập nhật kiểm tra câu hỏi tối ưu
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -410,7 +410,6 @@ io.on('connection', (socket) => {
 
     let q = room.questions[room.currentQ];
 
-    // Trừ 20 điểm khi skip
     room.matchScores[socket.username] = (room.matchScores[socket.username] || 0) - 20;
 
     io.to(roomId).emit('roundResult', { 
@@ -583,6 +582,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  /* TỐI ƯU HÓA SO SÁNH ĐÁP ÁN (SỬA LỖI ĐẤU TRÍ) */
   socket.on('submitAnswer', (data) => {
     let roomId = socket.roomId;
     let room = rooms[roomId];
@@ -600,17 +600,15 @@ io.on('connection', (socket) => {
     let userIndex = typeof data === 'object' && data !== null ? data.index : data;
     let userVal = typeof data === 'object' && data !== null ? data.value : data;
 
-    if (q.type === 'fill' || q.type === 'arrange' || typeof q.answer === 'string') {
+    // Chuẩn hóa làm sạch chuỗi khi so sánh
+    const cleanStr = (s) => String(s || '').toLowerCase().replace(/[.,?!]/g, '').replace(/\s+/g, ' ').trim();
+
+    if (q.type === 'arrange' || q.type === 'fill' || typeof q.answer === 'string') {
       let parsedUserVal = userVal;
-      
       if (Array.isArray(parsedUserVal)) {
         parsedUserVal = parsedUserVal.join(' ');
       }
-
-      let clientAnswerStr = String(parsedUserVal || '').trim().replace(/\s+/g, ' ').toLowerCase();
-      let correctAnswerStr = String(q.answer || '').trim().replace(/\s+/g, ' ').toLowerCase();
-
-      if (clientAnswerStr === correctAnswerStr) {
+      if (cleanStr(parsedUserVal) === cleanStr(q.answer)) {
         isCorrect = true;
       }
     } else {
