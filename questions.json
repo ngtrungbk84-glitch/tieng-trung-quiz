@@ -4,7 +4,7 @@
       "id": 1,
       "type": "audio",
       "q": "Nghe đoạn hội thoại và chọn câu trả lời đúng: What is your name?",
-      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l1/meetmi1.mp3",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/meetmi10.mp3",
       "img": "https://ngoinhatienganh.com/writeyourbook/anh/l1/1.jpg",
       "options": ["My name is Mimi.", "I am ten years old.", "I live in a city."],
       "answer": 0
@@ -44,7 +44,7 @@
   "id": 6,
   "type": "audio",
   "q": "Nghe đoạn băng và chọn hình ảnh/đáp án tương ứng:",
-  "media": "https://ngoinhatienganh.com/writeyourbook/anh/l1/meetmi1.mp3",
+  "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/meetmi10.mp3",
   "options": ["Mimi lives in a city", "Mimi lives on a farm", "Mimi lives in a village"],
   "answer": 0
 }
