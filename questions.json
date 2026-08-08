@@ -1,132 +1,54 @@
-[
-  {
-    "id": 1,
-    "type": "Multiple Choice",
-    "question": "Choose the correct word: 'She is a _____ doctor.'",
-    "options": ["good", "well", "best", "better"],
-    "answer": "good",
-    "explanation": "Cần một tính từ đứng trước danh từ 'doctor'."
-  },
-  {
-    "id": 2,
-    "type": "Fill in the Blank",
-    "question": "Complete the sentence: 'I have been living here _____ 2010.'",
-    "options": ["for", "since", "from", "in"],
-    "answer": "since",
-    "explanation": "'Since' đi với mốc thời gian trong thì Hiện tại hoàn thành."
-  },
-  {
-    "id": 3,
-    "type": "Synonym",
-    "question": "Find the SYNONYM of 'enormous':",
-    "options": ["tiny", "huge", "weak", "soft"],
-    "answer": "huge",
-    "explanation": "'Enormous' và 'huge' đều có nghĩa là cực kỳ to lớn."
-  },
-  {
-    "id": 4,
-    "type": "Antonym",
-    "question": "Find the ANTONYM of 'brave':",
-    "options": ["cowardly", "fearless", "bold", "strong"],
-    "answer": "cowardly",
-    "explanation": "'Brave' (dũng cảm) đối nghĩa với 'cowardly' (nhát gan)."
-  },
-  {
-    "id": 5,
-    "type": "Word Reorder",
-    "question": "Reorder: 'always / He / early / arrives'",
-    "options": [
-      "He arrives always early",
-      "He always arrives early",
-      "Always he arrives early",
-      "He early arrives always"
-    ],
-    "answer": "He always arrives early",
-    "explanation": "Trạng từ chỉ tần suất 'always' đứng trước động từ thường 'arrives'."
-  },
-  {
-    "id": 6,
-    "type": "Error Identification",
-    "question": "Find the error: 'He don't like playing football on Sundays.'",
-    "options": ["don't", "like", "playing", "on"],
-    "answer": "don't",
-    "explanation": "Chủ ngữ 'He' phải dùng 'doesn't' thay vì 'don't'."
-  },
-  {
-    "id": 7,
-    "type": "Picture / Vocabulary Matching",
-    "question": "Which word matches a picture of a fruit that is red and round?",
-    "options": ["Banana", "Apple", "Orange", "Grape"],
-    "answer": "Apple",
-    "explanation": "Quả táo (Apple) thường tròn và có màu đỏ."
-  },
-  {
-    "id": 8,
-    "type": "Pronunciation",
-    "question": "Which word has the underlined part pronounced differently?",
-    "options": ["cat", "hat", "car", "map"],
-    "answer": "car",
-    "explanation": "'car' phát âm là /ɑː/, các từ còn lại phát âm là /æ/."
-  },
-  {
-    "id": 9,
-    "type": "Stress Pattern",
-    "question": "Which word has a different stress pattern?",
-    "options": ["happy", "teacher", "doctor", "relax"],
-    "answer": "relax",
-    "explanation": "'relax' nhấn âm 2, các từ còn lại nhấn âm 1."
-  },
-  {
-    "id": 10,
-    "type": "Idioms & Phrases",
-    "question": "What does the idiom 'Piece of cake' mean?",
-    "options": ["Very difficult", "Very easy", "A slice of food", "Sweet thing"],
-    "answer": "Very easy",
-    "explanation": "'Piece of cake' là thành ngữ chỉ việc gì đó rất dễ dàng."
-  },
-  {
-    "id": 11,
-    "type": "Phrasal Verb",
-    "question": "Give _____ smoking! It is extremely bad for your health.",
-    "options": ["up", "on", "in", "off"],
-    "answer": "up",
-    "explanation": "'Give up' nghĩa là từ bỏ."
-  },
-  {
-    "id": 12,
-    "type": "Odd One Out",
-    "question": "Find the odd one out:",
-    "options": ["Dog", "Cat", "Table", "Elephant"],
-    "answer": "Table",
-    "explanation": "'Table' là đồ vật, các từ còn lại là động vật."
-  },
-  {
-    "id": 13,
-    "type": "Preposition Check",
-    "question": "She is deeply interested _____ learning foreign languages.",
-    "options": ["in", "on", "at", "about"],
-    "answer": "in",
-    "explanation": "Cấu trúc: 'be interested in + V-ing'."
-  },
-  {
-    "id": 14,
-    "type": "Tense Identification",
-    "question": "Identify the tense: 'I have just finished my homework.'",
-    "options": [
-      "Simple Past",
-      "Present Perfect",
-      "Past Perfect",
-      "Present Continuous"
-    ],
-    "answer": "Present Perfect",
-    "explanation": "Cấu trúc 'have + V3/ed' là thì Hiện tại hoàn thành."
-  },
-  {
-    "id": 15,
-    "type": "Reading Comprehension",
-    "question": "Read and answer: 'Tom is a doctor. He works in a hospital.' -> Where does Tom work?",
-    "options": ["School", "Hospital", "Bank", "Park"],
-    "answer": "Hospital",
-    "explanation": "Dựa vào câu 'He works in a hospital'."
-  }
-]
+{
+  "10": [
+    {
+      "id": 1,
+      "type": "audio",
+      "q": "Nghe audio và chọn đáp án đúng:",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/meetmi10.mp3",
+      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/3.jpg",
+      "options": ["In a small village.", "In a big city.", "On a farm."],
+      "answer": 1
+    },
+    {
+      "id": 2,
+      "type": "image",
+      "q": "What does the city look like in the evening?",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/5.jpg",
+      "options": ["Very bright with many lights.", "Very dark and quiet.", "Very cold and snowy."],
+      "answer": 0
+    },
+    {
+      "id": 3,
+      "type": "audio",
+      "q": "Nghe đoạn hội thoại và cho biết Mimi sống với ai:",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/meetmi10.mp3",
+      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/6.jpg",
+      "options": ["With her friends.", "With her family.", "With her teacher."],
+      "answer": 1
+    },
+    {
+      "id": 4,
+      "type": "arrange",
+      "q": "Sắp xếp các từ thành câu hoàn chỉnh:",
+      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/1.jpg",
+      "words": ["city.", "big", "a", "in", "live", "I", "Mimi.", "is", "name", "My"],
+      "answer": "My name is Mimi. I live in a big city."
+    },
+    {
+      "id": 5,
+      "type": "image",
+      "q": "Why does Mimi love her city?",
+      "media": "https://ngoinhatienganh.com/writeyourbook/anh/l10/7.jpg",
+      "options": ["Because it is very exciting.", "Because it is very quiet.", "Because it is very small."],
+      "answer": 0
+    },
+    {
+      "id": 6,
+      "type": "arrange",
+      "q": "Sắp xếp các từ thành câu hoàn chỉnh:",
+      "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/4.jpg",
+      "words": ["buildings.", "tall", "many", "are", "There"],
+      "answer": "There are many tall buildings."
+    }
+  ]
+}
