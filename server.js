@@ -162,7 +162,36 @@ function startTurnTimer(roomId) {
     }
   }, 1000);
 }
+function finishGameDueToForfeit(roomId, winnerName, loserName) {
+  let room = rooms[roomId];
+  if (!room) return;
 
+  room.isInGame = false;
+  stopRoomTimer(roomId);
+  if (room.botTimeout) clearTimeout(room.botTimeout);
+
+  let basePoints = getBasePoints(room.lesson);
+
+  if (winnerName && usersData[winnerName]) {
+    usersData[winnerName].wins = (usersData[winnerName].wins || 0) + 1;
+    usersData[winnerName].exp = Math.ceil((usersData[winnerName].exp || 0) + basePoints + 50);
+  }
+  if (loserName && usersData[loserName]) {
+    let oldExp = usersData[loserName].exp || 0;
+    usersData[loserName].exp = Math.ceil(Math.max(0, oldExp - basePoints * 1.5)); // Trừ điểm nặng hơn khi chủ động bỏ cuộc
+  }
+
+  saveUserDataAsync();
+  io.to(roomId).emit('gameOver', { winner: winnerName, loser: loserName, reason: 'forfeit' });
+  io.emit('leaderboardUpdate', getLeaderboard());
+
+  if (!room.isPractice) {
+    createRoomObject(roomId, room.lesson);
+    io.emit('roomListUpdate', getPublicRooms());
+  } else {
+    delete rooms[roomId];
+  }
+}
 function scheduleBotAnswer(roomId) {
   let room = rooms[roomId];
   if (!room || !room.isPractice) return;
@@ -456,6 +485,67 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 🏳️ XỬ LÝ NÚT BỎ CUỘC (FORFEIT)
+  socket.on('playerForfeit', () => {
+    let roomId = socket.roomId;
+    let room = rooms[roomId];
+    if (!room || !room.isInGame) return;
+
+    let loserName = socket.username;
+    let winnerPlayer = room.players.find(p => p.username !== loserName);
+    let winnerName = winnerPlayer ? winnerPlayer.username : null;
+
+    // Gọi hàm kết thúc trận đấu do có người bỏ cuộc
+    finishGameDueToForfeit(roomId, winnerName, loserName);
+  });
+
+  // ⏩ XỬ LÝ NÚT BỎ QUA CÂU HỎI (SKIP)
+  socket.on('skipQuestion', () => {
+    let roomId = socket.roomId;
+    let room = rooms[roomId];
+    if (!room || !room.isInGame) return;
+
+    let q = room.questions[room.currentQ];
+    if (!q) return;
+
+    // Kiểm tra đúng lượt chơi (nếu không phải đấu bot)
+    if (!room.isPractice) {
+      let activePlayer = room.players[room.activeTurnIndex];
+      if (!activePlayer || activePlayer.username !== socket.username) return;
+    }
+
+    // Trừ 20 điểm người chơi bấm Skip
+    let penalty = 20;
+    room.matchScores[socket.username] = Math.ceil((room.matchScores[socket.username] || 0) - penalty);
+
+    // Dừng timer hiện tại nếu có
+    if (!room.isPractice) stopRoomTimer(roomId);
+    else if (room.botTimeout) clearTimeout(room.botTimeout);
+
+    // Báo kết quả Bỏ qua câu hỏi về cho Client
+    io.to(roomId).emit('roundResult', { 
+      winner: null, 
+      isSkip: true,
+      player: socket.username,
+      matchScores: room.matchScores,
+      correctIndex: q.answer
+    });
+
+    // Đổi lượt chơi nếu không phải đấu Bot
+    if (!room.isPractice) room.activeTurnIndex = room.activeTurnIndex === 0 ? 1 : 0;
+
+    // Chuyển sang câu hỏi tiếp theo sau 1.2 giây
+    setTimeout(() => {
+      room.currentQ++;
+      if (room.currentQ < room.questions.length) {
+        io.to(roomId).emit('nextQuestion', room.questions[room.currentQ]);
+        if (room.isPractice) scheduleBotAnswer(roomId);
+        else startTurnTimer(roomId);
+      } else {
+        finishGameByQuestions(roomId);
+      }
+    }, 1200);
+  });
   socket.on('disconnect', () => {
     let roomId = socket.roomId;
     if (roomId && rooms[roomId]) {
