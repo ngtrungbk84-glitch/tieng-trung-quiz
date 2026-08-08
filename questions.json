@@ -39,7 +39,15 @@
   "img": "https://ngoinhatienganh.com/writeyourbook/anh/l10/1.jpg",
   "words": ["I", "live", "in", "a", "big", "city."],
   "answer": "I live in a big city."
-} 
+} ,
+    {
+  "id": 6,
+  "type": "audio",
+  "q": "Nghe đoạn băng và chọn hình ảnh/đáp án tương ứng:",
+  "media": "https://ngoinhatienganh.com/writeyourbook/anh/l1/meetmi1.mp3",
+  "options": ["Mimi lives in a city", "Mimi lives on a farm", "Mimi lives in a village"],
+  "answer": 0
+}
   ],
   "10": [
     {
