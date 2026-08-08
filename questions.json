@@ -131,6 +131,37 @@
       "q": "Mùa nào trong năm thường có nhiều tuyết rơi?",
       "options": ["Summer", "Autumn", "Winter"],
       "answer": 2
-    }
+    },
+    {
+  "id": 4,
+  "type": "choice",
+  "q": "Listen carefully: What do you say when you see your teacher in the morning?",
+  "img": "https://ngoinhatienganh.com/writeyourbook/anh/l1/2.jpg",
+  "options": [
+    "Good morning, teacher!",
+    "Good night, teacher!",
+    "Goodbye, see you again!"
+  ],
+  "answer": 0
+},
+    {
+  "id": 5,
+  "type": "choice",
+  "q": "Listen and choose: Beautiful city",
+  "options": [
+    "Thành phố đẹp",
+    "Thành phố nhỏ",
+    "Thành phố ồn ào"
+  ],
+  "answer": 0
+},
+    {
+  "id": 6,
+  "type": "arrange",
+  "q": "Listen and arrange the sentence: There are many tall buildings in my city.",
+  "words": ["There", "are", "many", "tall", "buildings", "in", "my", "city."],
+  "answer": "There are many tall buildings in my city."
+}
+    
   ]
 }
