@@ -303,7 +303,39 @@ function finishGameByQuestions(roomId) {
 io.on('connection', (socket) => {
   socket.emit('roomListUpdate', getPublicRooms());
   socket.emit('leaderboardUpdate', getLeaderboard());
+// 🚪 XỬ LÝ NÚT QUAY LẠI SẢNH (BACK TO LOBBY)
+  socket.on('backToLobby', () => {
+    let roomId = socket.roomId;
+    if (roomId && rooms[roomId]) {
+      let room = rooms[roomId];
 
+      // Nếu đang trong trận đấu mà tự ý rời phòng quay lại sảnh => Xử Bỏ cuộc
+      if (room.isInGame) {
+        let loserName = socket.username;
+        let winnerPlayer = room.players.find(p => p.username !== loserName);
+        let winnerName = winnerPlayer ? winnerPlayer.username : null;
+        
+        // Cho người rời phòng thua ngay lập tức
+        finishGameDueToForfeit(roomId, winnerName, loserName);
+      } else {
+        // Nếu chưa vào game (đang ở phòng chờ) thì chỉ xóa người chơi khỏi phòng
+        room.players = room.players.filter(p => p.username !== socket.username);
+        socket.leave(roomId);
+        socket.roomId = null;
+
+        // Nếu phòng không còn ai thì xóa phòng
+        if (room.players.length === 0) {
+          delete rooms[roomId];
+        } else {
+          io.to(roomId).emit('updateRoom', room);
+        }
+        io.emit('roomListUpdate', getPublicRooms());
+      }
+    }
+    
+    // Gửi thông báo xác nhận đã rời phòng thành công về cho Client
+    socket.emit('leftRoomSuccess');
+  });
   socket.on('login', ({ username, password }) => {
     let user = usersData[username];
     if (!user || String(user.password) !== String(password)) {
@@ -546,13 +578,37 @@ io.on('connection', (socket) => {
       }
     }, 1200);
   });
+  // 🔌 XỬ LÝ KHI NGƯỜI CHƠI MẤT KẾT NỐI / REFRESH TRANG
   socket.on('disconnect', () => {
+    let username = socket.username;
     let roomId = socket.roomId;
+
+    if (username) {
+      delete activeUsers[username];
+      io.emit('onlineUsersUpdate', Object.keys(activeUsers));
+    }
+
     if (roomId && rooms[roomId]) {
       let room = rooms[roomId];
-      room.players = room.players.filter(p => p.id !== socket.id);
-      if (room.isPractice) delete rooms[roomId];
-      else io.emit('roomListUpdate', getPublicRooms());
+
+      // Nếu người chơi Refresh / Tắt tab KHI ĐANG TRONG TRẬN ĐẤU
+      if (room.isInGame) {
+        let loserName = username;
+        let winnerPlayer = room.players.find(p => p.username !== loserName);
+        let winnerName = winnerPlayer ? winnerPlayer.username : null;
+
+        // Xử bỏ cuộc ngay lập tức
+        finishGameDueToForfeit(roomId, winnerName, loserName);
+      } else {
+        // Nếu chưa vào trận thì xóa khỏi phòng chờ
+        room.players = room.players.filter(p => p.username !== username);
+        if (room.players.length === 0) {
+          delete rooms[roomId];
+        } else {
+          io.to(roomId).emit('updateRoom', room);
+        }
+        io.emit('roomListUpdate', getPublicRooms());
+      }
     }
   });
 });
